@@ -403,6 +403,47 @@ img.avatar {
   font-weight: 900;
 }
 
+.notification-button {
+  position: relative;
+}
+
+.notification-button span {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.notification-panel {
+  position: fixed;
+  top: 78px;
+  right: 24px;
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(620px, calc(100vh - 104px));
+  overflow: auto;
+  z-index: 45;
+  background: white;
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  box-shadow: 0 24px 70px rgba(29, 29, 31, 0.16);
+  padding: 16px;
+}
+
+.notification-item {
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 12px;
+  background: #fbfbfd;
+}
+
 .legacy-settings-summary {
   display: none;
 }

@@ -686,7 +686,7 @@ export function SettingsView() {
               <div className="form-grid">
                 <div className="field"><label>Nombre completo</label><input value={editing.fullName} onChange={(event) => setEditing({ ...editing, fullName: event.target.value })} /></div>
                 <div className="field"><label>Correo</label><input value={editing.email} onChange={(event) => setEditing({ ...editing, email: event.target.value })} /></div>
-                <div className="field"><label>Contrasena inicial</label><input type="password" value={editing.password ?? ""} onChange={(event) => setEditing({ ...editing, password: event.target.value })} /></div>
+                <div className="field"><label>Contraseña inicial</label><input type="password" value={editing.password ?? ""} onChange={(event) => setEditing({ ...editing, password: event.target.value })} /></div>
                 <div className="field"><label>Area</label><input value={editing.area} onChange={(event) => setEditing({ ...editing, area: event.target.value })} /></div>
                 <div className="field"><label>Rol</label><select value={editing.role} onChange={(event) => setEditing({ ...editing, role: event.target.value })}>{roles.map((role) => <option key={role}>{role}</option>)}</select></div>
                 <div className="field"><label>Estado</label><select value={editing.status} onChange={(event) => setEditing({ ...editing, status: event.target.value as UserProfile["status"] })}><option>Activo</option><option>Pendiente</option><option>Inactivo</option><option>Bloqueado</option><option>Archivado</option></select></div>
@@ -698,7 +698,7 @@ export function SettingsView() {
                 <p className="eyebrow">Ficha comercial vinculada</p>
                 <div className="form-grid">
                   <div className="field"><label>Codigo ejecutivo</label><input value={editing.code ?? ""} onChange={(event) => setEditing({ ...editing, code: event.target.value })} placeholder="Ej. E-120" /></div>
-                  <div className="field"><label>Turno</label><select value={editing.shift ?? "Manana"} onChange={(event) => setEditing({ ...editing, shift: event.target.value as UserProfile["shift"] })}><option>Manana</option><option>Tarde</option><option>Noche</option></select></div>
+                  <div className="field"><label>Turno</label><select value={editing.shift ?? "Manana"} onChange={(event) => setEditing({ ...editing, shift: event.target.value as UserProfile["shift"] })}><option value="Manana">Mañana</option><option>Tarde</option><option>Noche</option></select></div>
                   <div className="field"><label>Equipo</label><select value={editing.teamId ?? ""} onChange={(event) => setEditing({ ...editing, teamId: event.target.value })}><option value="">Sin equipo</option>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></div>
                 </div>
               </div>

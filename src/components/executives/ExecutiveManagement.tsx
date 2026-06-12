@@ -195,7 +195,7 @@ export function ExecutiveManagement() {
                 <div className="field">
                   <label>Turno</label>
                   <select value={editing.shift} onChange={(event) => setEditing({ ...editing, shift: event.target.value as Executive["shift"] })}>
-                    <option>Manana</option>
+                    <option value="Manana">Mañana</option>
                     <option>Tarde</option>
                     <option>Noche</option>
                   </select>

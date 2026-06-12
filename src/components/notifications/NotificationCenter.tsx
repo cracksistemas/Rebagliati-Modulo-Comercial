@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CheckCircle2, NotebookPen, Volume2 } from "lucide-react";
+import { Bell, CheckCircle2, NotebookPen } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
@@ -38,9 +38,12 @@ function playNotificationSound() {
 
 export function NotificationCenter({ profileName, role }: { profileName: string; role: string }) {
   const [state, setState] = useState(getCommercialState);
-  const [open, setOpen] = useState(false);
+  const [startupModalOpen, setStartupModalOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderDraft, setReminderDraft] = useState("");
+  const [startupChecked, setStartupChecked] = useState(false);
+  const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
@@ -68,13 +71,23 @@ export function NotificationCenter({ profileName, role }: { profileName: string;
   const unread = visibleNotifications.filter((item) => !item.readBy.includes(profileName));
 
   useEffect(() => {
-    if (!unread.length) return;
-    const timer = window.setTimeout(() => {
-      setOpen(true);
+    if (!startupChecked) {
+      setStartupChecked(true);
+      setPreviousUnreadCount(unread.length);
+      if (unread.length) {
+        const timer = window.setTimeout(() => {
+          setStartupModalOpen(true);
+          playNotificationSound();
+        }, 650);
+        return () => window.clearTimeout(timer);
+      }
+      return;
+    }
+    if (unread.length > previousUnreadCount) {
       playNotificationSound();
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [unread.length]);
+    }
+    setPreviousUnreadCount(unread.length);
+  }, [previousUnreadCount, startupChecked, unread.length]);
 
   function markRead(notificationId?: string) {
     const next = {
@@ -144,7 +157,7 @@ export function NotificationCenter({ profileName, role }: { profileName: string;
 
   return (
     <>
-      <button className="icon-button notification-button" onClick={() => { setOpen(true); if (unread.length) playNotificationSound(); }} title="Notificaciones">
+      <button className="icon-button notification-button" onClick={() => setPanelOpen((value) => !value)} title="Notificaciones">
         <Bell size={18} />
         {unread.length ? <span>{unread.length}</span> : null}
       </button>
@@ -152,7 +165,34 @@ export function NotificationCenter({ profileName, role }: { profileName: string;
         <NotebookPen size={18} />
       </button>
 
-      {open ? (
+      {panelOpen ? (
+        <div className="notification-panel">
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+            <strong>Notificaciones</strong>
+            <button className="ghost-button" onClick={() => markRead()}>Marcar todo</button>
+          </div>
+          <div className="grid" style={{ marginTop: 10 }}>
+            {visibleNotifications.length ? visibleNotifications.slice(0, 6).map((notification) => (
+              <div key={notification.id} className="notification-item">
+                <strong>{notification.title}</strong>
+                <p className="muted">{notification.message}</p>
+                {notification.requestStatus ? <span className="badge">{notification.requestStatus}{notification.authorizedBy ? ` por ${notification.authorizedBy}` : ""}</span> : null}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                  {notification.type === "Autorizacion descuento" && notification.requestStatus === "Pendiente" ? (
+                    <>
+                      <button className="ghost-button" onClick={() => authorize(notification, false)}>Rechazar</button>
+                      <button className="primary-button" onClick={() => authorize(notification, true)}>Autorizar</button>
+                    </>
+                  ) : null}
+                  <button className="ghost-button" onClick={() => markRead(notification.id)}>Leida</button>
+                </div>
+              </div>
+            )) : <p className="muted">No hay notificaciones activas.</p>}
+          </div>
+        </div>
+      ) : null}
+
+      {startupModalOpen ? (
         <div className="modal-backdrop">
           <div className="modal" style={{ width: "min(680px, 94vw)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
@@ -160,7 +200,6 @@ export function NotificationCenter({ profileName, role }: { profileName: string;
                 <p className="eyebrow">Notificaciones</p>
                 <h2>Comunicados activos</h2>
               </div>
-              <button className="ghost-button" onClick={() => playNotificationSound()}><Volume2 size={16} /> Sonido</button>
             </div>
             <div className="grid" style={{ marginTop: 14 }}>
               {visibleNotifications.length ? visibleNotifications.map((notification) => (
@@ -170,7 +209,7 @@ export function NotificationCenter({ profileName, role }: { profileName: string;
                       <strong>{notification.title}</strong>
                       <p className="muted">{notification.type} - {notification.audience} - {notification.createdAt}</p>
                     </div>
-                    {notification.readBy.includes(profileName) ? <span className="badge"><CheckCircle2 size={15} /> Leido</span> : null}
+                    {notification.readBy.includes(profileName) ? <span className="badge"><CheckCircle2 size={15} /> Leído</span> : null}
                   </div>
                   <p>{notification.message}</p>
                   {notification.requestStatus ? (
@@ -186,14 +225,14 @@ export function NotificationCenter({ profileName, role }: { profileName: string;
                         <button className="primary-button" onClick={() => authorize(notification, true)}>Autorizar</button>
                       </>
                     ) : null}
-                    <button className="ghost-button" onClick={() => markRead(notification.id)}>Marcar leida</button>
+                    <button className="ghost-button" onClick={() => markRead(notification.id)}>Marcar leída</button>
                   </div>
                 </div>
               )) : <p className="muted">No hay notificaciones activas.</p>}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
-              <button className="ghost-button" onClick={() => markRead()}>Marcar todo leido</button>
-              <button className="primary-button" onClick={() => setOpen(false)}>Cerrar</button>
+              <button className="ghost-button" onClick={() => markRead()}>Marcar todo leído</button>
+              <button className="primary-button" onClick={() => setStartupModalOpen(false)}>Cerrar</button>
             </div>
           </div>
         </div>

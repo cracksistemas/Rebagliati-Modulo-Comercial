@@ -39,10 +39,10 @@ const navItems = [
   { href: "/executives", label: "Ejecutivos", icon: Flag, permission: "executives.manage" },
   { href: "/incidents", label: "Incidencias", icon: AlertTriangle, permission: "incidents.view" },
   { href: "/goals", label: "Metas", icon: Target, permission: "goals.manage" },
-  { href: "/sales/validation", label: "Validacion de ventas", icon: ClipboardCheck, permission: "sales.validation" },
+  { href: "/sales/validation", label: "Validación de ventas", icon: ClipboardCheck, permission: "sales.validation" },
   { href: "/customer-map", label: "Mapa de Clientes", icon: BookOpenCheck, permission: "customer-map.view" },
   { href: "/reports", label: "Reportes", icon: BarChart3, permission: "reports.export" },
-  { href: "/settings", label: "Configuracion", icon: Settings, permission: "settings.users" }
+  { href: "/settings", label: "Configuración", icon: Settings, permission: "settings.users" }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const title = useMemo(() => {
     if (pathname.includes("customer-map")) return "Mapa de Clientes";
-    if (pathname.includes("settings")) return "Configuracion";
+    if (pathname.includes("settings")) return "Configuración";
     if (pathname.includes("executives")) return "Directorio comercial";
     if (pathname.includes("incidents")) return "Incidencias";
     if (pathname.includes("teams")) return "Ventas por equipo";

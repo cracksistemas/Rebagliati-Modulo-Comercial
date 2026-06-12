@@ -41,7 +41,7 @@ export default function LoginPage() {
         </div>
         <h1 style={{ fontSize: "2.2rem", marginBottom: 12 }}>Iniciar sesion</h1>
         <div className="field"><label>Correo</label><input value={email} onChange={(event) => setEmail(event.target.value)} type="email" /></div>
-        <div className="field" style={{ marginTop: 12 }}><label>Contrasena</label><input value={password} onChange={(event) => setPassword(event.target.value)} type="password" /></div>
+        <div className="field" style={{ marginTop: 12 }}><label>Contraseña</label><input value={password} onChange={(event) => setPassword(event.target.value)} type="password" /></div>
         {errorMessage ? <p style={{ color: "#FF3B30", marginTop: 12 }}>{errorMessage}</p> : null}
         <button className="primary-button" style={{ width: "100%", marginTop: 18 }} onClick={login} disabled={loading}>{loading ? "Preparando panel..." : "Entrar"}</button>
       </section>

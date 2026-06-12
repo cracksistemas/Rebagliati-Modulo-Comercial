@@ -60,6 +60,25 @@ function isUuid(value?: string) {
   return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));
 }
 
+function localTeamName(teamId?: string) {
+  const map: Record<string, string> = {
+    "team-azul": "Equipo Azul",
+    "team-guinda": "Equipo Guinda",
+    "team-verde": "Equipo Verde",
+    "team-amarillo": "Equipo Amarillo"
+  };
+  return teamId ? map[teamId] ?? teamId : "";
+}
+
+async function resolveTeamUuid(admin: ReturnType<typeof createAdminClient>, teamId?: string) {
+  if (!teamId) return null;
+  if (isUuid(teamId)) return teamId;
+  const teamName = localTeamName(teamId);
+  const { data, error } = await admin.from("teams").select("id").ilike("name", teamName).maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
 function normalizeStatus(status = "Pendiente") {
   return status === "Activo";
 }
@@ -394,14 +413,17 @@ export async function POST(request: NextRequest) {
 
       if (payload.teamId) {
         stage = "asignar equipo";
-        await admin.from("team_members").update({ active: false, end_date: new Date().toISOString().slice(0, 10) }).eq("executive_id", executiveId);
-        const { error: memberError } = await admin.from("team_members").insert({
-          team_id: payload.teamId,
-          executive_id: executiveId,
-          start_date: new Date().toISOString().slice(0, 10),
-          active: true
-        });
-        if (memberError) throw memberError;
+        const resolvedTeamId = await resolveTeamUuid(admin, payload.teamId);
+        if (resolvedTeamId) {
+          await admin.from("team_members").update({ active: false, end_date: new Date().toISOString().slice(0, 10) }).eq("executive_id", executiveId);
+          const { error: memberError } = await admin.from("team_members").insert({
+            team_id: resolvedTeamId,
+            executive_id: executiveId,
+            start_date: new Date().toISOString().slice(0, 10),
+            active: true
+          });
+          if (memberError) throw memberError;
+        }
       }
     }
 
