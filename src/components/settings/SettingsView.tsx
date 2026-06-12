@@ -413,8 +413,8 @@ export function SettingsView() {
         </table>
       </section>
 
-      <section className="grid grid-2">
-        <div className="card">
+      <section className="grid grid-2 legacy-settings-summary">
+        <div className="card legacy-permissions-card" aria-hidden="true">
           <p className="eyebrow">Roles y permisos</p>
           <h2>Matriz por modulo</h2>
           {["Ventas", "Ranking", "Equipos", "Mapa de Clientes", "Configuracion", "Reportes"].map((module) => (

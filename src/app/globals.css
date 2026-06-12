@@ -128,7 +128,7 @@ textarea {
   display: none;
 }
 
-.collapsed .primary-button {
+.collapsed .sidebar > .primary-button {
   width: 44px;
   min-width: 44px;
   padding: 0;
@@ -202,6 +202,20 @@ textarea {
 .danger-button:hover,
 .icon-button:hover {
   transform: translateY(-1px);
+}
+
+.primary-button,
+.ghost-button,
+.danger-button {
+  max-width: 100%;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.card .primary-button,
+.card .ghost-button,
+.card .danger-button {
+  min-width: max-content;
 }
 
 .nav {
@@ -331,6 +345,16 @@ h1 {
   place-items: center;
   font-weight: 900;
   flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.avatar img,
+img.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
 }
 
 .table {
@@ -344,6 +368,12 @@ h1 {
   border-bottom: 1px solid var(--border-soft);
   text-align: left;
   vertical-align: middle;
+}
+
+.table td:last-child,
+.table th:last-child {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .table th {
@@ -362,6 +392,10 @@ h1 {
   background: #f0f0f3;
   font-size: 0.8rem;
   font-weight: 900;
+}
+
+.legacy-settings-summary {
+  display: none;
 }
 
 .modal-backdrop {

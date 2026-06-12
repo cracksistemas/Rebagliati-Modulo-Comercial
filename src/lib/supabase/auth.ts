@@ -23,6 +23,14 @@ interface DbProfile {
 }
 
 export async function loadCurrentProfile(): Promise<SessionProfile | null> {
+  try {
+    const response = await fetch("/api/session/me", { cache: "no-store" });
+    const payload = (await response.json()) as { ok?: boolean; data?: SessionProfile };
+    if (response.ok && payload.ok && payload.data) return payload.data;
+  } catch {
+    // Fallback to direct profile read below.
+  }
+
   const supabase = createClient() as any;
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id;
@@ -38,6 +46,9 @@ export async function loadCurrentProfile(): Promise<SessionProfile | null> {
   if (!data) return null;
 
   const profile = data as DbProfile;
+  const updatedProfile = await loadCurrentProfile();
+  if (updatedProfile) return updatedProfile;
+
   return {
     id: profile.id,
     fullName: profile.full_name,

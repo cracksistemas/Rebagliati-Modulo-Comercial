@@ -76,6 +76,12 @@ export async function GET() {
       .eq("id", user.id)
       .maybeSingle();
 
+    const { data: executive } = await supabase
+      .from("executives")
+      .select("photo_url")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+
     const role = String(profile?.role ?? user.user_metadata?.role ?? "ejecutivo");
     const { data: greetings } = await supabase
       .from("role_greetings")
@@ -96,7 +102,7 @@ export async function GET() {
         email: user.email,
         fullName: profile?.full_name ?? user.user_metadata?.full_name ?? user.email,
         role,
-        avatarUrl: await resolveAvatarUrl(profile?.avatar_url ?? user.user_metadata?.avatar_url ?? null),
+        avatarUrl: await resolveAvatarUrl(profile?.avatar_url ?? executive?.photo_url ?? user.user_metadata?.avatar_url ?? null),
         greeting
       }
     });

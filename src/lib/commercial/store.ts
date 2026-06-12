@@ -6,7 +6,7 @@ import { seedState } from "./seed";
 import type { CommercialState, Executive, Sale, Team } from "./types";
 
 const STORAGE_KEY = "reba-commercial-state";
-const SETTINGS_LOCK_MIGRATION_KEY = "reba-settings-superadmin-only-v1";
+const SETTINGS_LOCK_MIGRATION_KEY = "reba-settings-superadmin-only-v2";
 
 function canUseStorage() {
   return typeof window !== "undefined";
