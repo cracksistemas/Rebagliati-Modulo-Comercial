@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { defaultRolePermissions, normalizeRoleLabel } from "@/lib/commercial/admin-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,23 @@ async function resolveAvatarUrl(value?: string | null) {
   }
 }
 
+async function loadPermissions(role: string) {
+  const roleLabel = normalizeRoleLabel(role);
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("role_module_permissions")
+      .select("permission_id")
+      .eq("role", roleLabel);
+    if (error) throw error;
+    const permissions = ((data as { permission_id: string }[] | null) ?? []).map((item) => item.permission_id);
+    if (permissions.length) return permissions;
+  } catch {
+    // Fallback to bundled defaults when settings tables are not available.
+  }
+  return defaultRolePermissions.find((item) => item.role === roleLabel)?.permissions ?? [];
+}
+
 export async function GET() {
   try {
     const supabase = (await createClient()) as any;
@@ -103,6 +121,7 @@ export async function GET() {
         fullName: profile?.full_name ?? user.user_metadata?.full_name ?? user.email,
         role,
         avatarUrl: await resolveAvatarUrl(profile?.avatar_url ?? executive?.photo_url ?? user.user_metadata?.avatar_url ?? null),
+        permissions: await loadPermissions(role),
         greeting
       }
     });

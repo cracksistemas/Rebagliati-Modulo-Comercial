@@ -19,7 +19,6 @@ import {
   UsersRound
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getCommercialState } from "@/lib/commercial/store";
 import { supabase } from "@/lib/supabase/client";
 
 type SessionHeaderProfile = {
@@ -27,6 +26,7 @@ type SessionHeaderProfile = {
   role: string;
   avatarUrl?: string | null;
   greeting?: string;
+  permissions?: string[];
 };
 
 const navItems = [
@@ -41,17 +41,6 @@ const navItems = [
   { href: "/reports", label: "Reportes", icon: BarChart3, permission: "reports.export" },
   { href: "/settings", label: "Configuracion", icon: Settings, permission: "settings.users" }
 ];
-
-function normalizeRoleLabel(role = "") {
-  const normalized = role.toLowerCase();
-  if (normalized.includes("admin_sistema") || normalized.includes("super")) return "Superadministrador";
-  if (normalized.includes("gerencia")) return "Gerencia";
-  if (normalized.includes("jefe")) return "Jefe de ventas";
-  if (normalized.includes("lider")) return "Lider de ventas";
-  if (normalized.includes("marketing") || normalized.includes("soporte")) return "Marketing";
-  if (normalized.includes("lectura")) return "Solo lectura";
-  return "Ejecutivo";
-}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -86,11 +75,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const visibleNavItems = useMemo(() => {
-    const state = getCommercialState();
-    const roleLabel = normalizeRoleLabel(profile?.role ?? "");
-    const roleConfig = state.rolePermissions.find((item) => item.role === roleLabel);
-    if (roleConfig) {
-      return navItems.filter((item) => roleConfig.permissions.includes(item.permission));
+    if (profile?.permissions?.length) {
+      return navItems.filter((item) => profile.permissions?.includes(item.permission));
     }
 
     const role = profile?.role.toLowerCase() ?? "";

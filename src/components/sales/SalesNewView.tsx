@@ -68,6 +68,38 @@ export function SalesNewView() {
     };
   }, [state.executives]);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadCommercialOptions() {
+      try {
+        const response = await fetch("/api/commercial/options", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: {
+            programs?: SalesProgram[];
+            discounts?: typeof state.discounts;
+          };
+        };
+        if (!alive || !response.ok || !payload.ok || !payload.data) return;
+        setState((current) => {
+          const next = {
+            ...current,
+            programs: payload.data?.programs ?? current.programs,
+            discounts: payload.data?.discounts ?? current.discounts
+          };
+          setCommercialState(next);
+          return next;
+        });
+      } catch {
+        // Conserva opciones locales si Supabase todavia no tiene tablas de configuracion.
+      }
+    }
+    loadCommercialOptions();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   function update<K extends keyof Sale>(key: K, value: Sale[K]) {
     const next = { ...sale, [key]: value };
     if (key === "executiveId") {
@@ -128,6 +160,26 @@ export function SalesNewView() {
     update("productName", name);
     setProgramDraft("");
     setStatus("Programa agregado al historial.");
+
+    fetch("/api/commercial/options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, productType: sale.productType })
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!payload?.ok || !payload.data) return;
+        setState((current) => {
+          const synced = {
+            ...current,
+            programs: payload.data.programs ?? current.programs,
+            discounts: payload.data.discounts ?? current.discounts
+          };
+          setCommercialState(synced);
+          return synced;
+        });
+      })
+      .catch(() => undefined);
   }
 
   function applyDiscount(discountId: string) {

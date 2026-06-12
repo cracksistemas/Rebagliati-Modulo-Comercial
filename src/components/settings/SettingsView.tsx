@@ -4,7 +4,8 @@ import { Camera, Lock, ShieldCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
-import type { AuthorizedDiscount, Executive, ModulePermission, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
+import type { AuthorizedDiscount, Executive, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
+import { permissionCatalog } from "@/lib/commercial/admin-config";
 
 const roles = [
   "Superadministrador",
@@ -14,21 +15,6 @@ const roles = [
   "Ejecutivo",
   "Marketing",
   "Solo lectura"
-];
-
-const permissionCatalog: ModulePermission[] = [
-  { id: "dashboard.resumen", module: "Dashboard", submodule: "Resumen mensual" },
-  { id: "sales.new", module: "Ventas", submodule: "Registrar venta" },
-  { id: "sales.validation", module: "Ventas", submodule: "Validacion de ventas" },
-  { id: "ranking.executives", module: "Ranking", submodule: "Ranking de ejecutivos" },
-  { id: "teams.view", module: "Equipos", submodule: "Ventas por equipo" },
-  { id: "executives.manage", module: "Ejecutivos", submodule: "Directorio comercial" },
-  { id: "goals.manage", module: "Metas", submodule: "Metas mensuales" },
-  { id: "customer-map.view", module: "Mapa de Clientes", submodule: "Perfiles y argumentos" },
-  { id: "reports.export", module: "Reportes", submodule: "Exportables" },
-  { id: "settings.users", module: "Configuracion", submodule: "Usuarios" },
-  { id: "settings.roles", module: "Configuracion", submodule: "Roles y permisos" },
-  { id: "settings.discounts", module: "Configuracion", submodule: "Descuentos autorizados" }
 ];
 
 type EditableUser = UserProfile & {
@@ -96,6 +82,7 @@ export function SettingsView() {
   const [discountDraft, setDiscountDraft] = useState<AuthorizedDiscount>({ id: "", label: "", amount: 0, active: true });
   const [selectedRole, setSelectedRole] = useState("Ejecutivo");
   const [sessionProfile, setSessionProfile] = useState<SessionProfile | null>(null);
+  const [settingsStatus, setSettingsStatus] = useState("");
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   useEffect(() => {
@@ -115,6 +102,41 @@ export function SettingsView() {
       }
     }
     loadUsers();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadRemoteSettings() {
+      try {
+        const response = await fetch("/api/admin/settings", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: {
+            discounts?: AuthorizedDiscount[];
+            rolePermissions?: RolePermissionConfig[];
+            persisted?: boolean;
+            warning?: string;
+          };
+        };
+        if (!alive || !response.ok || !payload.ok || !payload.data) return;
+        setState((current) => {
+          const next = {
+            ...current,
+            discounts: payload.data?.discounts ?? current.discounts,
+            rolePermissions: payload.data?.rolePermissions ?? current.rolePermissions
+          };
+          setCommercialState(next);
+          return next;
+        });
+        setSettingsStatus(payload.data.persisted ? "" : "Pendiente ejecutar SQL de configuracion en Supabase.");
+      } catch {
+        setSettingsStatus("");
+      }
+    }
+    loadRemoteSettings();
     return () => {
       alive = false;
     };
@@ -304,7 +326,24 @@ export function SettingsView() {
     }
   }
 
-  function saveDiscount() {
+  async function persistAdminSettings(discounts: AuthorizedDiscount[], rolePermissions: RolePermissionConfig[]) {
+    const response = await fetch("/api/admin/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ discounts, rolePermissions })
+    });
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      error?: string;
+      data?: { discounts?: AuthorizedDiscount[]; rolePermissions?: RolePermissionConfig[] };
+    };
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error ?? "No se pudo guardar configuracion.");
+    }
+    return payload.data;
+  }
+
+  async function saveDiscount() {
     if (!canEditRules || !discountDraft.label.trim()) return;
     const discount: AuthorizedDiscount = {
       ...discountDraft,
@@ -313,9 +352,10 @@ export function SettingsView() {
       active: discountDraft.active
     };
     const exists = state.discounts.some((item) => item.id === discount.id);
+    const discounts = exists ? state.discounts.map((item) => (item.id === discount.id ? discount : item)) : [discount, ...state.discounts];
     const next = {
       ...state,
-      discounts: exists ? state.discounts.map((item) => (item.id === discount.id ? discount : item)) : [discount, ...state.discounts],
+      discounts,
       audit: [
         {
           id: crypto.randomUUID(),
@@ -332,10 +372,26 @@ export function SettingsView() {
     };
     setState(next);
     setCommercialState(next);
-    setDiscountDraft({ id: "", label: "", amount: 0, active: true });
+    setSettingsStatus("Guardando configuracion...");
+    try {
+      const saved = await persistAdminSettings(discounts, state.rolePermissions);
+      if (saved?.discounts || saved?.rolePermissions) {
+        const synced = {
+          ...next,
+          discounts: saved.discounts ?? next.discounts,
+          rolePermissions: saved.rolePermissions ?? next.rolePermissions
+        };
+        setState(synced);
+        setCommercialState(synced);
+      }
+      setSettingsStatus("Configuracion guardada.");
+      setDiscountDraft({ id: "", label: "", amount: 0, active: true });
+    } catch (error) {
+      setSettingsStatus(error instanceof Error ? error.message : "No se pudo guardar configuracion.");
+    }
   }
 
-  function toggleRolePermission(role: string, permissionId: string) {
+  async function toggleRolePermission(role: string, permissionId: string) {
     if (!canEditRules) return;
     const current = state.rolePermissions.find((item) => item.role === role) ?? { role, permissions: [] };
     const hasPermission = current.permissions.includes(permissionId);
@@ -363,6 +419,22 @@ export function SettingsView() {
     };
     setState(next);
     setCommercialState(next);
+    setSettingsStatus("Guardando permisos...");
+    try {
+      const saved = await persistAdminSettings(next.discounts, next.rolePermissions);
+      if (saved?.discounts || saved?.rolePermissions) {
+        const synced = {
+          ...next,
+          discounts: saved.discounts ?? next.discounts,
+          rolePermissions: saved.rolePermissions ?? next.rolePermissions
+        };
+        setState(synced);
+        setCommercialState(synced);
+      }
+      setSettingsStatus("Permisos guardados.");
+    } catch (error) {
+      setSettingsStatus(error instanceof Error ? error.message : "No se pudo guardar permisos.");
+    }
   }
 
   return (
@@ -413,7 +485,7 @@ export function SettingsView() {
         </table>
       </section>
 
-      <section className="grid grid-2 legacy-settings-summary">
+      <section className="grid grid-2 legacy-settings-summary" hidden style={{ display: "none" }}>
         <div className="card legacy-permissions-card" aria-hidden="true">
           <p className="eyebrow">Roles y permisos</p>
           <h2>Matriz por modulo</h2>
@@ -445,6 +517,7 @@ export function SettingsView() {
         <div className="card">
           <p className="eyebrow">Permisos editables</p>
           <h2>Modulos y submodulos por rol</h2>
+          {settingsStatus ? <p className="badge" style={{ marginTop: 10 }}>{settingsStatus}</p> : null}
           <div className="field" style={{ marginTop: 12 }}>
             <label>Rol a configurar</label>
             <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)}>

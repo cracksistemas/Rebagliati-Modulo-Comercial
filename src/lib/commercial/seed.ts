@@ -1,4 +1,5 @@
 import type { CommercialState } from "./types";
+import { defaultDiscounts, defaultPrograms, defaultRolePermissions } from "./admin-config";
 
 export const seedState: CommercialState = {
   month: "Junio 2026",
@@ -107,28 +108,9 @@ export const seedState: CommercialState = {
       avatarUrl: "/avatars/gerencia.svg"
     }
   ],
-  programs: [
-    { id: "program-salud-ocupacional", name: "Diplomado en Salud Ocupacional", productType: "Diplomado", active: true, createdAt: "2026-06-01" },
-    { id: "program-emergencias", name: "Emergencias y Desastres", productType: "Curso Modular", active: true, createdAt: "2026-06-01" },
-    { id: "program-inyectoterapia", name: "Inyectoterapia", productType: "Curso", active: true, createdAt: "2026-06-01" },
-    { id: "program-uci", name: "UCI y Cuidados Criticos", productType: "Diplomado", active: true, createdAt: "2026-06-01" }
-  ],
-  discounts: [
-    { id: "discount-none", label: "Sin descuento", amount: 0, active: true },
-    { id: "discount-50", label: "S/ 50 autorizado", amount: 50, active: true },
-    { id: "discount-100", label: "S/ 100 autorizado", amount: 100, active: true },
-    { id: "discount-150", label: "S/ 150 autorizado", amount: 150, active: true },
-    { id: "discount-special", label: "Descuento especial con autorizacion", amount: 0, active: true, requiresApproval: true }
-  ],
-  rolePermissions: [
-    { role: "Superadministrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export", "settings.users", "settings.roles", "settings.discounts"] },
-    { role: "Administrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export"] },
-    { role: "Jefe de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export"] },
-    { role: "Lider de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "customer-map.view", "reports.export"] },
-    { role: "Ejecutivo", permissions: ["dashboard.resumen", "sales.new", "ranking.executives", "teams.view", "customer-map.view"] },
-    { role: "Marketing", permissions: ["dashboard.resumen", "ranking.executives", "teams.view", "customer-map.view", "reports.export"] },
-    { role: "Solo lectura", permissions: ["dashboard.resumen", "ranking.executives", "teams.view", "customer-map.view", "reports.export"] }
-  ],
+  programs: defaultPrograms,
+  discounts: defaultDiscounts,
+  rolePermissions: defaultRolePermissions,
   audit: [
     {
       id: "audit-1",
