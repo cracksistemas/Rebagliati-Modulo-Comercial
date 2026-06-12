@@ -1,5 +1,9 @@
 -- Incidencias, notificaciones y opciones comerciales dinamicas.
 
+alter table public.authorized_discounts
+add column if not exists discount_type text not null default 'amount'
+check (discount_type in ('amount','percent'));
+
 create table if not exists public.commercial_options (
   id text primary key,
   option_type text not null check (option_type in ('lead_source','payment_method')),
