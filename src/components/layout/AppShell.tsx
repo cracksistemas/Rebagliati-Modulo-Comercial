@@ -157,7 +157,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <h1>{title}</h1>
             {profile?.greeting ? <p className="muted" style={{ marginTop: 8 }}>{profile.greeting}</p> : null}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div className="topbar-actions">
             <span className="badge">Junio 2026</span>
             <span className="badge">
               {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={profile.fullName} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover" }} /> : null}

@@ -46,9 +46,7 @@ textarea {
 
 .app-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: var(--sidebar-width, 280px) 1fr;
-  transition: grid-template-columns 220ms ease;
+  display: block;
 }
 
 .sidebar {
@@ -281,7 +279,9 @@ textarea {
 
 .main {
   min-width: 0;
+  margin-left: var(--sidebar-width, 280px);
   padding: 24px;
+  transition: margin-left 220ms ease;
 }
 
 .topbar {
@@ -291,6 +291,19 @@ textarea {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+}
+
+.topbar > div:first-child {
+  min-width: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
 }
 
 .eyebrow {

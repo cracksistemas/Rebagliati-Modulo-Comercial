@@ -222,6 +222,7 @@ export function SettingsView() {
       ),
     [query, state.users]
   );
+  const linkedExecutiveCount = users.filter((user) => user.executiveId || isExecutiveRole(user.role)).length;
   const currentAdminRole = sessionProfile?.role ?? dedupeUsersByEmail(state.users).find((user) => user.email === "admin@test.com")?.role ?? "";
   const canEditRules = canManageCommercialRules(currentAdminRole);
 
@@ -543,7 +544,7 @@ export function SettingsView() {
         <div className="card metric"><span className="muted">Usuarios activos</span><strong>{users.filter((u) => u.status === "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Usuarios inactivos</span><strong>{users.filter((u) => u.status !== "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Roles creados</span><strong>{roles.length}</strong></div>
-        <div className="card metric"><span className="muted">Ejecutivos vinculados</span><strong>{state.executives.length}</strong></div>
+        <div className="card metric"><span className="muted">Ejecutivos vinculados</span><strong>{linkedExecutiveCount}</strong></div>
       </section>
 
       <section className="card">
