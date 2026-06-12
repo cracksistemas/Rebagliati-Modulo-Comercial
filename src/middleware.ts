@@ -22,6 +22,10 @@ function isAssetPath(pathname: string) {
   );
 }
 
+function isApiPath(pathname: string) {
+  return pathname.startsWith("/api/");
+}
+
 function isBlockedByRole(pathname: string, role = "") {
   const normalized = role.toLowerCase();
 
@@ -64,12 +68,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (pathname === "/") {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    return NextResponse.redirect(loginUrl);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
+    if (!isPublicPath(pathname)) {
+      if (isApiPath(pathname)) {
+        return NextResponse.json({ ok: false, error: "Supabase no esta configurado en el servidor." }, { status: 503 });
+      }
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
     return response;
   }
 
@@ -91,6 +111,9 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && !isPublicPath(pathname)) {
+    if (isApiPath(pathname)) {
+      return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
+    }
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
@@ -107,6 +130,9 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
     if (isBlockedByRole(pathname, String(profile?.role ?? ""))) {
+      if (isApiPath(pathname)) {
+        return NextResponse.json({ ok: false, error: "No tienes permisos para realizar esta accion." }, { status: 403 });
+      }
       const dashboardUrl = request.nextUrl.clone();
       dashboardUrl.pathname = "/dashboard";
       dashboardUrl.search = "";

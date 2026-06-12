@@ -21,6 +21,13 @@ type EditableUser = UserProfile & {
   avatarDataUrl?: string;
 };
 
+type AvatarCropDraft = {
+  source: string;
+  x: number;
+  y: number;
+  zoom: number;
+};
+
 function isExecutiveRole(role: string) {
   return role.toLowerCase().includes("ejecutivo") || role.toLowerCase().includes("lider");
 }
@@ -46,6 +53,7 @@ export function SettingsView() {
   const [state, setState] = useState(getCommercialState);
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<EditableUser | null>(null);
+  const [avatarCrop, setAvatarCrop] = useState<AvatarCropDraft | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
@@ -61,13 +69,53 @@ export function SettingsView() {
   }
 
   function readAvatar(file?: File) {
-    if (!file || !editing) return;
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const avatarDataUrl = String(reader.result);
-      setEditing({ ...editing, avatarDataUrl, avatarUrl: avatarDataUrl });
+      setAvatarCrop({ source: String(reader.result), x: 50, y: 50, zoom: 115 });
     };
     reader.readAsDataURL(file);
+  }
+
+  function cropAvatarImage(draft: AvatarCropDraft) {
+    return new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const outputSize = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("No se pudo preparar el recorte de imagen."));
+          return;
+        }
+
+        const coverScale = Math.max(outputSize / image.width, outputSize / image.height) * (draft.zoom / 100);
+        const sourceWidth = outputSize / coverScale;
+        const sourceHeight = outputSize / coverScale;
+        const sourceX = Math.max(0, Math.min(image.width - sourceWidth, (image.width - sourceWidth) * (draft.x / 100)));
+        const sourceY = Math.max(0, Math.min(image.height - sourceHeight, (image.height - sourceHeight) * (draft.y / 100)));
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, outputSize, outputSize);
+        ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputSize, outputSize);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.onerror = () => reject(new Error("No se pudo leer la imagen seleccionada."));
+      image.src = draft.source;
+    });
+  }
+
+  async function applyAvatarCrop() {
+    if (!avatarCrop || !editing) return;
+    try {
+      const cropped = await cropAvatarImage(avatarCrop);
+      setEditing({ ...editing, avatarDataUrl: cropped, avatarUrl: cropped });
+      setAvatarCrop(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo recortar la foto.");
+    }
   }
 
   function applyUserLocally(user: UserProfile, executiveId?: string | null) {
@@ -128,7 +176,13 @@ export function SettingsView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(user)
       });
-      const payload = await response.json();
+      const rawResponse = await response.text();
+      let payload: { ok?: boolean; error?: string; data?: any };
+      try {
+        payload = rawResponse ? JSON.parse(rawResponse) : {};
+      } catch {
+        throw new Error(rawResponse.slice(0, 180) || "El servidor devolvio una respuesta no valida.");
+      }
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? "No se pudo crear el usuario.");
       }
@@ -279,6 +333,49 @@ export function SettingsView() {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
               <button className="ghost-button" onClick={() => setEditing(null)}>Cancelar</button>
               <button className="primary-button" onClick={() => saveUser(editing)} disabled={saving}>{saving ? "Guardando..." : "Guardar usuario"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {avatarCrop && (
+        <div className="modal-backdrop">
+          <div className="modal" style={{ width: "min(560px, 94vw)" }}>
+            <p className="eyebrow">Recorte de foto</p>
+            <h2>Ajustar imagen de perfil</h2>
+            <div style={{ display: "grid", placeItems: "center", gap: 18, marginTop: 18 }}>
+              <div style={{ width: 260, height: 260, borderRadius: "50%", overflow: "hidden", background: "#F5F5F7", boxShadow: "var(--shadow-soft)" }}>
+                <img
+                  src={avatarCrop.source}
+                  alt="Vista previa de recorte"
+                  style={{
+                    width: `${avatarCrop.zoom}%`,
+                    height: `${avatarCrop.zoom}%`,
+                    minWidth: "100%",
+                    minHeight: "100%",
+                    objectFit: "cover",
+                    objectPosition: `${avatarCrop.x}% ${avatarCrop.y}%`
+                  }}
+                />
+              </div>
+              <div className="form-grid" style={{ width: "100%" }}>
+                <div className="field">
+                  <label>Horizontal</label>
+                  <input type="range" min="0" max="100" value={avatarCrop.x} onChange={(event) => setAvatarCrop({ ...avatarCrop, x: Number(event.target.value) })} />
+                </div>
+                <div className="field">
+                  <label>Vertical</label>
+                  <input type="range" min="0" max="100" value={avatarCrop.y} onChange={(event) => setAvatarCrop({ ...avatarCrop, y: Number(event.target.value) })} />
+                </div>
+                <div className="field">
+                  <label>Zoom</label>
+                  <input type="range" min="100" max="190" value={avatarCrop.zoom} onChange={(event) => setAvatarCrop({ ...avatarCrop, zoom: Number(event.target.value) })} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button className="ghost-button" onClick={() => setAvatarCrop(null)}>Cancelar</button>
+              <button className="primary-button" onClick={applyAvatarCrop}>Usar recorte</button>
             </div>
           </div>
         </div>
