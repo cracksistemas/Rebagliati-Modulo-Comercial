@@ -80,6 +80,7 @@ export function ExecutiveManagement() {
             <th>Ejecutivo</th>
             <th>Codigo</th>
             <th>Equipo</th>
+            <th>Incidencias</th>
             <th>Turno</th>
             <th>Estado</th>
             <th>Opciones</th>
@@ -96,6 +97,11 @@ export function ExecutiveManagement() {
               </td>
               <td>{item.code}</td>
               <td>{state.teams.find((team) => team.id === item.teamId)?.name ?? "Sin equipo"}</td>
+              <td>
+                <span className="badge">
+                  {state.incidents.filter((incident) => incident.executiveId === item.id).length}
+                </span>
+              </td>
               <td>{item.shift}</td>
               <td><span className="badge">{item.status}</span></td>
               <td>

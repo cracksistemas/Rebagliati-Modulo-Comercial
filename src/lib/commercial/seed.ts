@@ -1,5 +1,5 @@
 import type { CommercialState } from "./types";
-import { defaultDiscounts, defaultPrograms, defaultRolePermissions } from "./admin-config";
+import { defaultDiscounts, defaultIncidentCriteria, defaultLeadSources, defaultPaymentMethods, defaultPrograms, defaultRolePermissions } from "./admin-config";
 
 export const seedState: CommercialState = {
   month: "Junio 2026",
@@ -109,8 +109,49 @@ export const seedState: CommercialState = {
     }
   ],
   programs: defaultPrograms,
+  leadSources: defaultLeadSources,
+  paymentMethods: defaultPaymentMethods,
   discounts: defaultDiscounts,
   rolePermissions: defaultRolePermissions,
+  incidents: [
+    {
+      id: "incident-1",
+      incidentCode: "INC-2026-0001",
+      incidentDate: "2026-06-11",
+      executiveId: "exec-2",
+      executiveName: "Anarosa Bustamante",
+      salesLeaderId: "exec-1",
+      salesLeaderName: "Eliana Benavides",
+      description: "Mensaje de seguimiento respondido fuera del tiempo esperado en Kommo.",
+      severity: "Moderada",
+      category: "Tiempo de respuesta",
+      status: "En revision",
+      solutionOrMeasure: "Conversacion correctiva pendiente de cierre.",
+      disciplinaryActionType: "Conversacion correctiva",
+      pointsDeducted: 3,
+      kommoLeadId: "KMO-2145",
+      courseOrProgram: "Emergencias y Desastres",
+      channel: "WhatsApp",
+      createdBy: "Administrador Comercial",
+      createdAt: "2026-06-11 16:20",
+      isRecurrent: false
+    }
+  ],
+  incidentCriteria: defaultIncidentCriteria,
+  notifications: [
+    {
+      id: "notification-1",
+      title: "Revision de ventas pendientes",
+      message: "Hay ventas pendientes de validacion. Revisar evidencias antes del cierre diario.",
+      audience: "Jefatura",
+      type: "Recordatorio",
+      active: true,
+      createdAt: "2026-06-12 09:00",
+      createdBy: "Administrador Comercial",
+      readBy: []
+    }
+  ],
+  reminders: [],
   audit: [
     {
       id: "audit-1",

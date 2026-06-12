@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
+  AlertTriangle,
   BookOpenCheck,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 type SessionHeaderProfile = {
   fullName: string;
@@ -35,6 +37,7 @@ const navItems = [
   { href: "/ranking", label: "Ranking de ejecutivos", icon: Trophy, permission: "ranking.executives" },
   { href: "/teams", label: "Ventas por equipo", icon: UsersRound, permission: "teams.view" },
   { href: "/executives", label: "Ejecutivos", icon: Flag, permission: "executives.manage" },
+  { href: "/incidents", label: "Incidencias", icon: AlertTriangle, permission: "incidents.view" },
   { href: "/goals", label: "Metas", icon: Target, permission: "goals.manage" },
   { href: "/sales/validation", label: "Validacion de ventas", icon: ClipboardCheck, permission: "sales.validation" },
   { href: "/customer-map", label: "Mapa de Clientes", icon: BookOpenCheck, permission: "customer-map.view" },
@@ -52,6 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.includes("customer-map")) return "Mapa de Clientes";
     if (pathname.includes("settings")) return "Configuracion";
     if (pathname.includes("executives")) return "Directorio comercial";
+    if (pathname.includes("incidents")) return "Incidencias";
     if (pathname.includes("teams")) return "Ventas por equipo";
     if (pathname.includes("ranking")) return "Ranking de ejecutivos";
     if (pathname.includes("sales")) return "Control de ventas";
@@ -82,12 +86,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const role = profile?.role.toLowerCase() ?? "";
     if (role.includes("ejecutivo") && !role.includes("lider")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/sales/new", "/ranking", "/teams", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/sales/new", "/ranking", "/teams", "/incidents", "/customer-map", "/reports"].includes(item.href)
       );
     }
     if (role.includes("marketing") || role.includes("solo lectura") || role.includes("marketing_soporte")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/ranking", "/teams", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/ranking", "/teams", "/incidents", "/customer-map", "/reports"].includes(item.href)
       );
     }
     return navItems;
@@ -159,6 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={profile.fullName} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover" }} /> : null}
               {profile?.fullName ?? "Gerencia Comercial"}
             </span>
+            <NotificationCenter profileName={profile?.fullName ?? "Usuario"} role={profile?.role ?? ""} />
             <button className="danger-button" onClick={logout}>
               <LogOut size={16} />
               Cerrar sesion

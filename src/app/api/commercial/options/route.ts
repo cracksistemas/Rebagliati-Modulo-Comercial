@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { defaultDiscounts, defaultPrograms } from "@/lib/commercial/admin-config";
+import { defaultDiscounts, defaultLeadSources, defaultPaymentMethods, defaultPrograms } from "@/lib/commercial/admin-config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ProductType, SalesProgram } from "@/lib/commercial/types";
@@ -31,9 +31,10 @@ function getErrorMessage(error: unknown, fallback = "No se pudo cargar opciones 
 
 async function loadOptions() {
   const admin = createAdminClient();
-  const [programsResult, discountsResult] = await Promise.all([
+  const [programsResult, discountsResult, optionsResult] = await Promise.all([
     admin.from("sales_programs").select("id,name,product_type,active,created_at").order("created_at", { ascending: false }),
-    admin.from("authorized_discounts").select("id,label,amount,active,requires_approval").eq("active", true).order("created_at", { ascending: true })
+    admin.from("authorized_discounts").select("id,label,amount,discount_type,active,requires_approval").eq("active", true).order("created_at", { ascending: true }),
+    admin.from("commercial_options").select("id,option_type,label,active,created_at").eq("active", true).order("created_at", { ascending: true })
   ]);
 
   if (programsResult.error) throw programsResult.error;
@@ -51,13 +52,26 @@ async function loadOptions() {
     id: item.id,
     label: item.label,
     amount: Number(item.amount ?? 0),
+    discountType: item.discount_type === "percent" ? "percent" : "amount",
     active: Boolean(item.active),
     requiresApproval: Boolean(item.requires_approval)
   }));
+  const rawOptions = optionsResult.error ? [] : (optionsResult.data as any[]) ?? [];
+  const options = rawOptions.map((item) => ({
+    id: item.id,
+    optionType: item.option_type,
+    label: item.label,
+    active: Boolean(item.active),
+    createdAt: item.created_at
+  }));
+  const leadSources = options.filter((item) => item.optionType === "lead_source").map(({ optionType, ...item }) => item);
+  const paymentMethods = options.filter((item) => item.optionType === "payment_method").map(({ optionType, ...item }) => item);
 
   return {
     programs: programs.length ? programs : defaultPrograms,
     discounts: discounts.length ? discounts : defaultDiscounts,
+    leadSources: leadSources.length ? leadSources : defaultLeadSources,
+    paymentMethods: paymentMethods.length ? paymentMethods : defaultPaymentMethods,
     persisted: true
   };
 }
@@ -75,6 +89,8 @@ export async function GET() {
       data: {
         programs: defaultPrograms,
         discounts: defaultDiscounts,
+        leadSources: defaultLeadSources,
+        paymentMethods: defaultPaymentMethods,
         persisted: false,
         warning: getErrorMessage(error)
       }
@@ -87,13 +103,39 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) return guard.response;
 
   try {
-    const payload = (await request.json()) as { name?: string; productType?: ProductType };
+    const payload = (await request.json()) as { kind?: "program" | "lead" | "payment"; name?: string; productType?: ProductType };
     const name = payload.name?.trim();
-    if (!name || !payload.productType) {
-      return NextResponse.json({ ok: false, error: "Nombre y tipo de producto son obligatorios." }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ ok: false, error: "Nombre obligatorio." }, { status: 400 });
     }
 
     const admin = createAdminClient();
+    if (payload.kind && payload.kind !== "program") {
+      const optionType = payload.kind === "lead" ? "lead_source" : "payment_method";
+      const idPrefix = payload.kind === "lead" ? "lead" : "pay";
+      const { data: existing, error: existingError } = await admin
+        .from("commercial_options")
+        .select("id")
+        .eq("option_type", optionType)
+        .ilike("label", name)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (!existing?.id) {
+        const { error } = await admin.from("commercial_options").insert({
+          id: `${idPrefix}-${crypto.randomUUID()}`,
+          option_type: optionType,
+          label: name,
+          active: true,
+          created_by: guard.userId
+        });
+        if (error) throw error;
+      }
+      const data = await loadOptions();
+      return NextResponse.json({ ok: true, data });
+    }
+    if (!payload.productType) {
+      return NextResponse.json({ ok: false, error: "Tipo de producto obligatorio." }, { status: 400 });
+    }
     const { data: existing, error: existingError } = await admin
       .from("sales_programs")
       .select("id")

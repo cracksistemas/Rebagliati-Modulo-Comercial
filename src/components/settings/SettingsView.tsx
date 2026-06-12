@@ -1,10 +1,10 @@
 "use client";
 
-import { Camera, Lock, ShieldCheck, UserPlus } from "lucide-react";
+import { Bell, Camera, Lock, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
-import type { AuthorizedDiscount, Executive, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
+import type { AuthorizedDiscount, CommercialNotification, Executive, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
 import { permissionCatalog } from "@/lib/commercial/admin-config";
 
 const roles = [
@@ -79,7 +79,18 @@ export function SettingsView() {
   const [avatarCrop, setAvatarCrop] = useState<AvatarCropDraft | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [discountDraft, setDiscountDraft] = useState<AuthorizedDiscount>({ id: "", label: "", amount: 0, active: true });
+  const [discountDraft, setDiscountDraft] = useState<AuthorizedDiscount>({ id: "", label: "", amount: 0, discountType: "amount", active: true });
+  const [notificationDraft, setNotificationDraft] = useState<CommercialNotification>({
+    id: "",
+    title: "",
+    message: "",
+    audience: "Todos",
+    type: "Comunicado",
+    active: true,
+    createdAt: "",
+    createdBy: "Administrador Comercial",
+    readBy: []
+  });
   const [selectedRole, setSelectedRole] = useState("Ejecutivo");
   const [sessionProfile, setSessionProfile] = useState<SessionProfile | null>(null);
   const [settingsStatus, setSettingsStatus] = useState("");
@@ -117,6 +128,7 @@ export function SettingsView() {
           data?: {
             discounts?: AuthorizedDiscount[];
             rolePermissions?: RolePermissionConfig[];
+            notifications?: CommercialNotification[];
             persisted?: boolean;
             warning?: string;
           };
@@ -126,7 +138,8 @@ export function SettingsView() {
           const next = {
             ...current,
             discounts: payload.data?.discounts ?? current.discounts,
-            rolePermissions: payload.data?.rolePermissions ?? current.rolePermissions
+            rolePermissions: payload.data?.rolePermissions ?? current.rolePermissions,
+            notifications: payload.data?.notifications?.length ? payload.data.notifications : current.notifications
           };
           setCommercialState(next);
           return next;
@@ -326,16 +339,16 @@ export function SettingsView() {
     }
   }
 
-  async function persistAdminSettings(discounts: AuthorizedDiscount[], rolePermissions: RolePermissionConfig[]) {
+  async function persistAdminSettings(discounts: AuthorizedDiscount[], rolePermissions: RolePermissionConfig[], notifications = state.notifications) {
     const response = await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ discounts, rolePermissions })
+      body: JSON.stringify({ discounts, rolePermissions, notifications })
     });
     const payload = (await response.json()) as {
       ok?: boolean;
       error?: string;
-      data?: { discounts?: AuthorizedDiscount[]; rolePermissions?: RolePermissionConfig[] };
+      data?: { discounts?: AuthorizedDiscount[]; rolePermissions?: RolePermissionConfig[]; notifications?: CommercialNotification[] };
     };
     if (!response.ok || !payload.ok) {
       throw new Error(payload.error ?? "No se pudo guardar configuracion.");
@@ -374,21 +387,66 @@ export function SettingsView() {
     setCommercialState(next);
     setSettingsStatus("Guardando configuracion...");
     try {
-      const saved = await persistAdminSettings(discounts, state.rolePermissions);
-      if (saved?.discounts || saved?.rolePermissions) {
+      const saved = await persistAdminSettings(discounts, state.rolePermissions, state.notifications);
+      if (saved?.discounts || saved?.rolePermissions || saved?.notifications) {
         const synced = {
           ...next,
           discounts: saved.discounts ?? next.discounts,
-          rolePermissions: saved.rolePermissions ?? next.rolePermissions
+          rolePermissions: saved.rolePermissions ?? next.rolePermissions,
+          notifications: saved.notifications?.length ? saved.notifications : next.notifications
         };
         setState(synced);
         setCommercialState(synced);
       }
       setSettingsStatus("Configuracion guardada.");
-      setDiscountDraft({ id: "", label: "", amount: 0, active: true });
+      setDiscountDraft({ id: "", label: "", amount: 0, discountType: "amount", active: true });
     } catch (error) {
       setSettingsStatus(error instanceof Error ? error.message : "No se pudo guardar configuracion.");
     }
+  }
+
+  function sendNotification() {
+    if (!canEditRules || !notificationDraft.title.trim() || !notificationDraft.message.trim()) return;
+    const notification: CommercialNotification = {
+      ...notificationDraft,
+      id: notificationDraft.id || `notification-${crypto.randomUUID()}`,
+      createdAt: new Date().toLocaleString("es-PE"),
+      createdBy: sessionProfile?.email ?? "Administrador Comercial",
+      readBy: [],
+      active: true
+    };
+    const next = {
+      ...state,
+      notifications: [notification, ...state.notifications],
+      audit: [
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toLocaleString("es-PE"),
+          actor: "Administrador Comercial",
+          action: "Envio comunicado",
+          module: "Notificaciones",
+          target: notification.title,
+          result: "Exitoso" as const,
+          criticality: "Media" as const
+        },
+        ...state.audit
+      ]
+    };
+    setState(next);
+    setCommercialState(next);
+    persistAdminSettings(next.discounts, next.rolePermissions, next.notifications).catch(() => undefined);
+    setNotificationDraft({
+      id: "",
+      title: "",
+      message: "",
+      audience: "Todos",
+      type: "Comunicado",
+      active: true,
+      createdAt: "",
+      createdBy: "Administrador Comercial",
+      readBy: []
+    });
+    setSettingsStatus("Comunicado enviado.");
   }
 
   async function toggleRolePermission(role: string, permissionId: string) {
@@ -421,12 +479,13 @@ export function SettingsView() {
     setCommercialState(next);
     setSettingsStatus("Guardando permisos...");
     try {
-      const saved = await persistAdminSettings(next.discounts, next.rolePermissions);
-      if (saved?.discounts || saved?.rolePermissions) {
+      const saved = await persistAdminSettings(next.discounts, next.rolePermissions, next.notifications);
+      if (saved?.discounts || saved?.rolePermissions || saved?.notifications) {
         const synced = {
           ...next,
           discounts: saved.discounts ?? next.discounts,
-          rolePermissions: saved.rolePermissions ?? next.rolePermissions
+          rolePermissions: saved.rolePermissions ?? next.rolePermissions,
+          notifications: saved.notifications?.length ? saved.notifications : next.notifications
         };
         setState(synced);
         setCommercialState(synced);
@@ -546,7 +605,8 @@ export function SettingsView() {
           <h2>Descuentos autorizados</h2>
           <div className="form-grid" style={{ marginTop: 12 }}>
             <div className="field"><label>Etiqueta</label><input value={discountDraft.label} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, label: event.target.value })} placeholder="Ej. S/ 200 campana" /></div>
-            <div className="field"><label>Monto</label><input type="number" value={discountDraft.amount} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, amount: Number(event.target.value) })} /></div>
+            <div className="field"><label>Tipo</label><select value={discountDraft.discountType} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, discountType: event.target.value as AuthorizedDiscount["discountType"] })}><option value="amount">Monto S/</option><option value="percent">Porcentaje %</option></select></div>
+            <div className="field"><label>{discountDraft.discountType === "percent" ? "Porcentaje" : "Monto"}</label><input type="number" value={discountDraft.amount} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, amount: Number(event.target.value) })} /></div>
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={discountDraft.requiresApproval ?? false} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, requiresApproval: event.target.checked })} />
               Requiere autorizacion
@@ -567,6 +627,40 @@ export function SettingsView() {
                   <p className="muted">{discount.requiresApproval ? "Especial con autorizacion" : money(discount.amount)} · {discount.active ? "Activo" : "Inactivo"}</p>
                 </span>
                 <button className="ghost-button" disabled={!canEditRules} onClick={() => setDiscountDraft(discount)}>Editar</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-2">
+        <div className="card">
+          <p className="eyebrow">Notificaciones</p>
+          <h2>Comunicados y recordatorios</h2>
+          <p className="muted">Los comunicados activos aparecen en la campana y se muestran como modal al ingresar.</p>
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <div className="field"><label>Titulo</label><input value={notificationDraft.title} disabled={!canEditRules} onChange={(event) => setNotificationDraft({ ...notificationDraft, title: event.target.value })} /></div>
+            <div className="field"><label>Audiencia</label><select value={notificationDraft.audience} disabled={!canEditRules} onChange={(event) => setNotificationDraft({ ...notificationDraft, audience: event.target.value as CommercialNotification["audience"] })}><option>Todos</option><option>Ejecutivos</option><option>Jefatura</option><option>Gerencia</option></select></div>
+            <div className="field"><label>Tipo</label><select value={notificationDraft.type} disabled={!canEditRules} onChange={(event) => setNotificationDraft({ ...notificationDraft, type: event.target.value as CommercialNotification["type"] })}><option>Comunicado</option><option>Recordatorio</option><option>Incidencia</option></select></div>
+            <div className="field" style={{ gridColumn: "1 / -1" }}><label>Mensaje</label><textarea value={notificationDraft.message} disabled={!canEditRules} onChange={(event) => setNotificationDraft({ ...notificationDraft, message: event.target.value })} /></div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <button className="primary-button" disabled={!canEditRules} onClick={sendNotification}><Send size={16} /> Enviar comunicado</button>
+          </div>
+        </div>
+        <div className="card">
+          <p className="eyebrow">Bandeja</p>
+          <h2>Ultimas notificaciones</h2>
+          <div className="grid">
+            {state.notifications.slice(0, 5).map((notification) => (
+              <div key={notification.id} style={{ display: "flex", gap: 10, borderBottom: "1px solid #E5E5EA", paddingBottom: 10 }}>
+                <span className="avatar"><Bell size={16} /></span>
+                <div>
+                  <strong>{notification.title}</strong>
+                  <p className="muted">{notification.audience} - {notification.type} - {notification.createdAt}</p>
+                  <p className="muted">{notification.message}</p>
+                  {notification.authorizedBy ? <span className="badge">Autorizado por {notification.authorizedBy}</span> : null}
+                </div>
               </div>
             ))}
           </div>

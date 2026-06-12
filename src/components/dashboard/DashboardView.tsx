@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, Link2, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Download, Link2, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getCommercialState, getValidatedSales, money } from "@/lib/commercial/store";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
@@ -57,6 +57,7 @@ function BattleCard({ leaders, total }: { leaders: Executive[]; total: number })
 export function DashboardView() {
   const [state, setState] = useState(getCommercialState);
   const [kommoMetric, setKommoMetric] = useState<KommoResponseMetric | null>(null);
+  const [kommoOpen, setKommoOpen] = useState(false);
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
@@ -97,9 +98,22 @@ export function DashboardView() {
 
   const ranking = rankExecutives(state);
   const totalExecutives = ranking.reduce((sum, item) => sum + item.currentSales, 0);
+  const incidentSummary = useMemo(() => {
+    const graves = state.incidents.filter((item) => item.severity === "Grave" || item.severity === "Critica").length;
+    const pendientes = state.incidents.filter((item) => item.status !== "Cerrado" && item.status !== "Corregido").length;
+    const criticalExecutive = state.executives.find((executive) => {
+      const items = state.incidents.filter((incident) => incident.executiveId === executive.id);
+      return items.length >= 3 || items.some((incident) => incident.severity === "Grave" || incident.severity === "Critica");
+    });
+    return { total: state.incidents.length, graves, pendientes, criticalExecutive: criticalExecutive?.fullName ?? "Sin criticos" };
+  }, [state.executives, state.incidents]);
 
   return (
     <div className="grid" style={{ gap: 18 }}>
+      <section style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+        <button className="ghost-button" onClick={() => setKommoOpen(true)}><Link2 size={16} /> Tiempos Kommo</button>
+        <button className="primary-button" onClick={() => window.print()}><Download size={16} /> Descargar PDF</button>
+      </section>
       <section className="grid grid-4">
         <div className="card metric"><span className="muted">Meta mensual</span><strong>{money(state.companyGoal)}</strong></div>
         <div className="card metric"><span className="muted">Acumulado</span><strong>{money(metrics.accumulated)}</strong></div>
@@ -169,6 +183,7 @@ export function DashboardView() {
           <h2>Validacion</h2>
           <p className="badge"><AlertTriangle size={16} /> {metrics.pending} ventas pendientes</p>
           <p className="badge"><Link2 size={16} /> CRM: {kommoMetric?.source ?? "cargando"}</p>
+          <p className="badge"><AlertTriangle size={16} /> {incidentSummary.total} incidencias del mes</p>
           <p className="muted">Las ventas pendientes no impactan el ranking oficial hasta validarse.</p>
         </div>
         <div className="card">
@@ -182,6 +197,44 @@ export function DashboardView() {
           <p className="muted" style={{ marginTop: 12 }}><TrendingUp size={16} /> Brecha: {money(metrics.gap)}</p>
         </div>
       </section>
+      <section className="grid grid-3">
+        <div className="card">
+          <p className="eyebrow">Incidencias</p>
+          <h2>Control del mes</h2>
+          <div className="grid">
+            <p className="badge"><AlertTriangle size={16} /> Total: {incidentSummary.total}</p>
+            <p className="badge">Graves: {incidentSummary.graves}</p>
+            <p className="badge">Pendientes: {incidentSummary.pendientes}</p>
+            <p className="muted">Ejecutivo en estado critico: {incidentSummary.criticalExecutive}</p>
+          </div>
+        </div>
+      </section>
+      {kommoOpen ? (
+        <div className="modal-backdrop">
+          <div className="modal" style={{ width: "min(760px, 94vw)" }}>
+            <p className="eyebrow">CRM Kommo</p>
+            <h2>Tiempos de respuesta por usuario</h2>
+            <p className="muted">Resumen conectado al endpoint de Kommo. Si el CRM no entrega muestras, se muestra el promedio fallback configurado.</p>
+            <table className="table">
+              <thead><tr><th>Usuario</th><th>Equipo</th><th>Tiempo promedio</th><th>Muestras</th><th>Estado</th></tr></thead>
+              <tbody>
+                {ranking.map((executive) => (
+                  <tr key={executive.id}>
+                    <td><strong>{executive.fullName}</strong></td>
+                    <td>{state.teams.find((team) => team.id === executive.teamId)?.name ?? "Sin equipo"}</td>
+                    <td>{kommoMetric?.averageResponseLabel ?? state.avgResponseTime}</td>
+                    <td>{kommoMetric?.samples ?? 0}</td>
+                    <td><span className="badge">{kommoMetric?.connected ? "Conectado" : "Fallback"}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button className="primary-button" onClick={() => setKommoOpen(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

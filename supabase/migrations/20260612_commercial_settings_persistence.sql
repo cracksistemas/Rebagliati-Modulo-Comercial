@@ -11,10 +11,15 @@ create table if not exists public.authorized_discounts (
   id text primary key,
   label text not null,
   amount numeric not null default 0 check (amount >= 0),
+  discount_type text not null default 'amount' check (discount_type in ('amount','percent')),
   active boolean not null default true,
   requires_approval boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.authorized_discounts
+add column if not exists discount_type text not null default 'amount'
+check (discount_type in ('amount','percent'));
 
 create table if not exists public.role_module_permissions (
   role text not null,
@@ -69,16 +74,17 @@ on conflict (id) do update set
   product_type = excluded.product_type,
   active = excluded.active;
 
-insert into public.authorized_discounts (id, label, amount, active, requires_approval)
+insert into public.authorized_discounts (id, label, amount, discount_type, active, requires_approval)
 values
-  ('discount-none', 'Sin descuento', 0, true, false),
-  ('discount-50', 'S/ 50 autorizado', 50, true, false),
-  ('discount-100', 'S/ 100 autorizado', 100, true, false),
-  ('discount-150', 'S/ 150 autorizado', 150, true, false),
-  ('discount-special', 'Descuento especial con autorizacion', 0, true, true)
+  ('discount-none', 'Sin descuento', 0, 'amount', true, false),
+  ('discount-50', 'S/ 50 autorizado', 50, 'amount', true, false),
+  ('discount-100', 'S/ 100 autorizado', 100, 'amount', true, false),
+  ('discount-10pct', '10% autorizado', 10, 'percent', true, false),
+  ('discount-special', 'Descuento especial con autorizacion', 0, 'amount', true, true)
 on conflict (id) do update set
   label = excluded.label,
   amount = excluded.amount,
+  discount_type = excluded.discount_type,
   active = excluded.active,
   requires_approval = excluded.requires_approval;
 

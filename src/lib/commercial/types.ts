@@ -68,8 +68,16 @@ export type AuthorizedDiscount = {
   id: string;
   label: string;
   amount: number;
+  discountType: "amount" | "percent";
   active: boolean;
   requiresApproval?: boolean;
+};
+
+export type CommercialOption = {
+  id: string;
+  label: string;
+  active: boolean;
+  createdAt: string;
 };
 
 export type ModulePermission = {
@@ -116,6 +124,81 @@ export type ClientProfile = {
   messages: string[];
 };
 
+export type IncidentSeverity = "Leve" | "Moderada" | "Grave" | "Critica";
+export type IncidentStatus =
+  | "Pendiente"
+  | "En revision"
+  | "Conversado con ejecutivo"
+  | "Medida aplicada"
+  | "Corregido"
+  | "Cerrado"
+  | "Reabierto";
+
+export type Incident = {
+  id: string;
+  incidentCode: string;
+  incidentDate: string;
+  executiveId: string;
+  executiveName: string;
+  salesLeaderId?: string;
+  salesLeaderName: string;
+  description: string;
+  severity: IncidentSeverity;
+  category: string;
+  status: IncidentStatus;
+  solutionOrMeasure?: string;
+  disciplinaryActionType?: string;
+  pointsDeducted: number;
+  clientName?: string;
+  leadId?: string;
+  kommoLeadId?: string;
+  courseOrProgram?: string;
+  channel?: string;
+  evidenceUrl?: string;
+  executiveResponse?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  closedBy?: string;
+  closedAt?: string;
+  isRecurrent: boolean;
+  recurrentGroupId?: string;
+};
+
+export type IncidentCriteria = {
+  categories: string[];
+  severities: { label: IncidentSeverity; points: number }[];
+  statuses: IncidentStatus[];
+  measures: string[];
+};
+
+export type CommercialNotification = {
+  id: string;
+  title: string;
+  message: string;
+  audience: "Todos" | "Ejecutivos" | "Jefatura" | "Gerencia";
+  type: "Comunicado" | "Recordatorio" | "Autorizacion descuento" | "Incidencia";
+  active: boolean;
+  createdAt: string;
+  createdBy: string;
+  readBy: string[];
+  requestStatus?: "Pendiente" | "Autorizado" | "Rechazado";
+  authorizedBy?: string;
+  authorizedAt?: string;
+  relatedSaleId?: string;
+};
+
+export type UserReminder = {
+  id: string;
+  title: string;
+  note: string;
+  dueAt?: string;
+  createdAt: string;
+  createdBy: string;
+  completed: boolean;
+};
+
 export type CommercialState = {
   month: string;
   companyGoal: number;
@@ -125,8 +208,14 @@ export type CommercialState = {
   sales: Sale[];
   users: UserProfile[];
   programs: SalesProgram[];
+  leadSources: CommercialOption[];
+  paymentMethods: CommercialOption[];
   discounts: AuthorizedDiscount[];
   rolePermissions: RolePermissionConfig[];
+  incidents: Incident[];
+  incidentCriteria: IncidentCriteria;
+  notifications: CommercialNotification[];
+  reminders: UserReminder[];
   audit: AuditEvent[];
   clientProfiles: ClientProfile[];
 };

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { defaultDiscounts, defaultRolePermissions } from "@/lib/commercial/admin-config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { AuthorizedDiscount, RolePermissionConfig } from "@/lib/commercial/types";
+import type { AuthorizedDiscount, CommercialNotification, RolePermissionConfig } from "@/lib/commercial/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,9 +41,10 @@ async function requireSuperAdmin() {
 
 async function loadSettingsFromSupabase() {
   const admin = createAdminClient();
-  const [discountsResult, permissionsResult] = await Promise.all([
-    admin.from("authorized_discounts").select("id,label,amount,active,requires_approval").order("created_at", { ascending: true }),
-    admin.from("role_module_permissions").select("role,permission_id").order("role", { ascending: true })
+  const [discountsResult, permissionsResult, notificationsResult] = await Promise.all([
+    admin.from("authorized_discounts").select("id,label,amount,discount_type,active,requires_approval").order("created_at", { ascending: true }),
+    admin.from("role_module_permissions").select("role,permission_id").order("role", { ascending: true }),
+    admin.from("commercial_notifications").select("id,title,message,audience,notification_type,active,created_at,read_by,request_status,authorized_by,authorized_at,related_sale_id").order("created_at", { ascending: false })
   ]);
 
   if (discountsResult.error) throw discountsResult.error;
@@ -53,6 +54,7 @@ async function loadSettingsFromSupabase() {
     id: item.id,
     label: item.label,
     amount: Number(item.amount ?? 0),
+    discountType: item.discount_type === "percent" ? "percent" : "amount",
     active: Boolean(item.active),
     requiresApproval: Boolean(item.requires_approval)
   }));
@@ -68,10 +70,26 @@ async function loadSettingsFromSupabase() {
     role,
     permissions
   }));
+  const notifications: CommercialNotification[] = notificationsResult.error ? [] : ((notificationsResult.data as any[]) ?? []).map((item) => ({
+    id: item.id,
+    title: item.title,
+    message: item.message,
+    audience: item.audience,
+    type: item.notification_type,
+    active: Boolean(item.active),
+    createdAt: item.created_at,
+    createdBy: "Sistema",
+    readBy: item.read_by ?? [],
+    requestStatus: item.request_status ?? undefined,
+    authorizedBy: item.authorized_by ?? undefined,
+    authorizedAt: item.authorized_at ?? undefined,
+    relatedSaleId: item.related_sale_id ?? undefined
+  }));
 
   return {
     discounts: discounts.length ? discounts : defaultDiscounts,
     rolePermissions: rolePermissions.length ? rolePermissions : defaultRolePermissions,
+    notifications,
     persisted: true
   };
 }
@@ -87,9 +105,10 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       data: {
-        discounts: defaultDiscounts,
-        rolePermissions: defaultRolePermissions,
-        persisted: false,
+            discounts: defaultDiscounts,
+            rolePermissions: defaultRolePermissions,
+            notifications: [],
+            persisted: false,
         warning: getErrorMessage(error, "Tablas de configuracion no disponibles.")
       }
     });
@@ -104,6 +123,7 @@ export async function POST(request: NextRequest) {
     const payload = (await request.json()) as {
       discounts?: AuthorizedDiscount[];
       rolePermissions?: RolePermissionConfig[];
+      notifications?: CommercialNotification[];
     };
     const admin = createAdminClient();
 
@@ -112,6 +132,7 @@ export async function POST(request: NextRequest) {
         id: discount.id,
         label: discount.label,
         amount: discount.amount,
+        discount_type: discount.discountType ?? "amount",
         active: discount.active,
         requires_approval: Boolean(discount.requiresApproval)
       }));
@@ -136,6 +157,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (payload.notifications) {
+      const notificationRows = payload.notifications.map((notification) => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        audience: notification.audience,
+        notification_type: notification.type,
+        active: notification.active,
+        read_by: notification.readBy,
+        request_status: notification.requestStatus ?? null,
+        authorized_by: notification.authorizedBy ?? null,
+        authorized_at: notification.authorizedAt ?? null,
+        related_sale_id: notification.relatedSaleId ?? null
+      }));
+      if (notificationRows.length) {
+        const { error } = await admin.from("commercial_notifications").upsert(notificationRows);
+        if (error) throw error;
+      }
+    }
+
     await admin.from("audit_logs").insert({
       table_name: "commercial_settings",
       record_id: crypto.randomUUID(),
@@ -143,7 +184,8 @@ export async function POST(request: NextRequest) {
       user_id: guard.userId,
       new_data: {
         discounts: payload.discounts?.length ?? 0,
-        role_permissions: payload.rolePermissions?.length ?? 0
+        role_permissions: payload.rolePermissions?.length ?? 0,
+        notifications: payload.notifications?.length ?? 0
       }
     });
 

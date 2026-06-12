@@ -3,7 +3,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { broadcastCommercialDataChange } from "./events";
 import { seedState } from "./seed";
-import type { CommercialState, Executive, Sale, Team } from "./types";
+import type { CommercialNotification, CommercialOption, CommercialState, Executive, Incident, Sale, Team, UserReminder } from "./types";
 
 const STORAGE_KEY = "reba-commercial-state";
 const SETTINGS_LOCK_MIGRATION_KEY = "reba-settings-superadmin-only-v2";
@@ -100,8 +100,17 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
     sales,
     users: asArray(source.users, seedState.users),
     programs: asArray(source.programs, seedState.programs),
-    discounts: asArray(source.discounts, seedState.discounts),
+    leadSources: asArray<CommercialOption>(source.leadSources, seedState.leadSources),
+    paymentMethods: asArray<CommercialOption>(source.paymentMethods, seedState.paymentMethods),
+    discounts: asArray(source.discounts, seedState.discounts).map((discount) => ({
+      ...discount,
+      discountType: discount.discountType === "percent" ? "percent" : "amount"
+    })),
     rolePermissions: asArray(source.rolePermissions, seedState.rolePermissions),
+    incidents: asArray<Incident>(source.incidents, seedState.incidents),
+    incidentCriteria: source.incidentCriteria ?? seedState.incidentCriteria,
+    notifications: asArray<CommercialNotification>(source.notifications, seedState.notifications),
+    reminders: asArray<UserReminder>(source.reminders, seedState.reminders),
     audit: asArray(source.audit, seedState.audit),
     clientProfiles: asArray(source.clientProfiles, seedState.clientProfiles)
   };
@@ -220,6 +229,50 @@ export function upsertSale(sale: Sale) {
         target: sale.productName,
         result: "Exitoso",
         criticality: sale.validationStatus === "validada" ? "Alta" : "Media"
+      },
+      ...state.audit
+    ]
+  });
+}
+
+export function upsertIncident(incident: Incident) {
+  const state = getCommercialState();
+  const exists = state.incidents.some((item) => item.id === incident.id);
+  setCommercialState({
+    ...state,
+    incidents: exists ? state.incidents.map((item) => (item.id === incident.id ? incident : item)) : [incident, ...state.incidents],
+    audit: [
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toLocaleString("es-PE"),
+        actor: incident.updatedBy ?? incident.createdBy,
+        action: exists ? "Edito incidencia" : "Registro incidencia",
+        module: "Incidencias",
+        target: incident.incidentCode,
+        result: "Exitoso",
+        criticality: incident.severity === "Critica" || incident.severity === "Grave" ? "Alta" : "Media"
+      },
+      ...state.audit
+    ]
+  });
+}
+
+export function pushNotification(notification: CommercialNotification) {
+  const state = getCommercialState();
+  const exists = state.notifications.some((item) => item.id === notification.id);
+  setCommercialState({
+    ...state,
+    notifications: exists ? state.notifications.map((item) => (item.id === notification.id ? notification : item)) : [notification, ...state.notifications],
+    audit: [
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toLocaleString("es-PE"),
+        actor: notification.createdBy,
+        action: exists ? "Actualizo notificacion" : "Envio notificacion",
+        module: "Notificaciones",
+        target: notification.title,
+        result: "Exitoso",
+        criticality: notification.type === "Autorizacion descuento" ? "Alta" : "Media"
       },
       ...state.audit
     ]
