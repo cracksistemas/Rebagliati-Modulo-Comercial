@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,36 @@ function greetingRoleKey(role: string) {
   if (normalized.includes("marketing")) return "Marketing";
   if (normalized.includes("lectura")) return "Solo lectura";
   return role;
+}
+
+function extractExecutivePhotoPath(photoUrl: string) {
+  try {
+    const url = new URL(photoUrl);
+    const markers = [
+      "/storage/v1/object/public/executive-photos/",
+      "/storage/v1/object/sign/executive-photos/"
+    ];
+    const marker = markers.find((item) => url.pathname.includes(item));
+    if (!marker) return null;
+    return decodeURIComponent(url.pathname.split(marker)[1] ?? "").split("?")[0];
+  } catch {
+    return null;
+  }
+}
+
+async function resolveAvatarUrl(value?: string | null) {
+  if (!value) return null;
+  if (value.startsWith("data:image/") || value.startsWith("/")) return value;
+  const path = value.startsWith("http") ? extractExecutivePhotoPath(value) : value;
+  if (!path) return value;
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.storage.from("executive-photos").createSignedUrl(path, 60 * 60 * 24);
+    if (error) return value.startsWith("http") ? value : null;
+    return data.signedUrl;
+  } catch {
+    return value.startsWith("http") ? value : null;
+  }
 }
 
 export async function GET() {
@@ -65,7 +96,7 @@ export async function GET() {
         email: user.email,
         fullName: profile?.full_name ?? user.user_metadata?.full_name ?? user.email,
         role,
-        avatarUrl: profile?.avatar_url ?? user.user_metadata?.avatar_url ?? null,
+        avatarUrl: await resolveAvatarUrl(profile?.avatar_url ?? user.user_metadata?.avatar_url ?? null),
         greeting
       }
     });

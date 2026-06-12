@@ -127,8 +127,40 @@ async function uploadAvatar(admin: ReturnType<typeof createAdminClient>, userId:
 
   if (error) return null;
 
-  const { data } = admin.storage.from("executive-photos").getPublicUrl(path);
-  return data.publicUrl;
+  return path;
+}
+
+function extractExecutivePhotoPath(photoUrl: string) {
+  try {
+    const url = new URL(photoUrl);
+    const markers = [
+      "/storage/v1/object/public/executive-photos/",
+      "/storage/v1/object/sign/executive-photos/"
+    ];
+    const marker = markers.find((item) => url.pathname.includes(item));
+    if (!marker) return null;
+    return decodeURIComponent(url.pathname.split(marker)[1] ?? "").split("?")[0];
+  } catch {
+    return null;
+  }
+}
+
+function getPersistableAvatarValue(value?: string | null) {
+  if (!value || value.startsWith("data:image/")) return null;
+  if (value.startsWith("http")) return extractExecutivePhotoPath(value);
+  return value;
+}
+
+async function resolveAvatarUrl(admin: ReturnType<typeof createAdminClient>, value?: string | null) {
+  if (!value) return null;
+  if (value.startsWith("data:image/") || value.startsWith("/")) return value;
+
+  const path = value.startsWith("http") ? extractExecutivePhotoPath(value) : value;
+  if (!path) return value;
+
+  const { data, error } = await admin.storage.from("executive-photos").createSignedUrl(path, 60 * 60 * 24);
+  if (error) return value.startsWith("http") ? value : null;
+  return data.signedUrl;
 }
 
 async function requireAdmin() {
@@ -174,7 +206,7 @@ export async function GET() {
     if (profileError) throw profileError;
 
     const { data: executives, error: executiveError } = ids.length
-      ? await admin.from("executives").select("id, profile_id, code, shift, status").in("profile_id", ids)
+      ? await admin.from("executives").select("id, profile_id, code, shift, status, photo_url").in("profile_id", ids)
       : { data: [], error: null };
     if (executiveError) throw executiveError;
 
@@ -189,8 +221,8 @@ export async function GET() {
     const membershipByExecutive = new Map((memberships ?? []).map((membership) => [membership.executive_id, membership]));
     const seenEmails = new Set<string>();
 
-    const users = authUsers
-      .map((authUser) => {
+    const users = (
+      await Promise.all(authUsers.map(async (authUser) => {
         const email = authUser.email?.trim().toLowerCase();
         if (!email || seenEmails.has(email)) return null;
         seenEmails.add(email);
@@ -202,6 +234,8 @@ export async function GET() {
         const role = roleLabel(String(profile?.role ?? metadata.role ?? "ejecutivo"));
         const fullName = String(profile?.full_name ?? metadata.full_name ?? authUser.email ?? "Usuario");
 
+        const rawAvatarUrl = profile?.avatar_url ?? executive?.photo_url ?? metadata.avatar_url ?? null;
+
         return {
           id: authUser.id,
           fullName,
@@ -211,13 +245,13 @@ export async function GET() {
           status: profile?.active === false ? "Inactivo" : "Activo",
           lastAccess: authUser.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString("es-PE") : "Sin acceso",
           createdAt: profile?.created_at ? String(profile.created_at).slice(0, 10) : String(authUser.created_at ?? "").slice(0, 10),
-          avatarUrl: profile?.avatar_url ?? metadata.avatar_url ?? undefined,
+          avatarUrl: await resolveAvatarUrl(admin, rawAvatarUrl),
           code: executive?.code ?? "",
           shift: executive?.shift ?? "Manana",
           teamId: membership?.team_id ?? ""
         };
-      })
-      .filter(Boolean);
+      }))
+    ).filter(Boolean);
 
     return NextResponse.json({ ok: true, data: { users } });
   } catch (error) {
@@ -321,15 +355,16 @@ export async function POST(request: NextRequest) {
     if (!userId) throw new Error("No se pudo resolver el usuario creado.");
 
     stage = "subir foto";
-    const uploadedAvatarUrl = await uploadAvatar(admin, userId, payload.avatarDataUrl);
-    const avatarUrl = uploadedAvatarUrl ?? payload.avatarUrl ?? null;
+    const uploadedAvatarPath = await uploadAvatar(admin, userId, payload.avatarDataUrl);
+    const avatarPath = uploadedAvatarPath ?? getPersistableAvatarValue(payload.avatarUrl);
+    const avatarUrl = await resolveAvatarUrl(admin, avatarPath);
 
     stage = "guardar perfil";
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,
       full_name: payload.fullName.trim(),
       role: roleCode,
-      avatar_url: avatarUrl,
+      avatar_url: avatarPath,
       active: normalizeStatus(payload.status),
       created_at: new Date().toISOString()
     });
@@ -349,7 +384,7 @@ export async function POST(request: NextRequest) {
         profile_id: userId,
         code: payload.code?.trim() || `E-${userId.slice(0, 4).toUpperCase()}`,
         full_name: payload.fullName.trim(),
-        photo_url: avatarUrl,
+        photo_url: avatarPath,
         shift: payload.shift ?? "Manana",
         status: normalizeStatus(payload.status) ? "Activo" : "Inactivo"
       };

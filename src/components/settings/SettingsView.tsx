@@ -128,17 +128,15 @@ export function SettingsView() {
           return;
         }
 
-        const coverScale = Math.max(outputSize / image.width, outputSize / image.height) * (draft.zoom / 100);
-        const sourceWidth = outputSize / coverScale;
-        const sourceHeight = outputSize / coverScale;
-        const centerX = (image.width - sourceWidth) / 2;
-        const centerY = (image.height - sourceHeight) / 2;
-        const sourceX = Math.max(0, Math.min(image.width - sourceWidth, centerX - draft.x / coverScale));
-        const sourceY = Math.max(0, Math.min(image.height - sourceHeight, centerY - draft.y / coverScale));
+        const containScale = Math.min(outputSize / image.width, outputSize / image.height) * (draft.zoom / 100);
+        const displayWidth = image.width * containScale;
+        const displayHeight = image.height * containScale;
+        const offsetX = (outputSize - displayWidth) / 2 + draft.x * (outputSize / 300);
+        const offsetY = (outputSize - displayHeight) / 2 + draft.y * (outputSize / 300);
 
         ctx.fillStyle = "#FFFFFF";
         ctx.fillRect(0, 0, outputSize, outputSize);
-        ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputSize, outputSize);
+        ctx.drawImage(image, offsetX, offsetY, displayWidth, displayHeight);
         resolve(canvas.toDataURL("image/jpeg", 0.82));
       };
       image.onerror = () => reject(new Error("No se pudo leer la imagen seleccionada."));
@@ -389,7 +387,7 @@ export function SettingsView() {
             <p className="eyebrow">Recorte de foto</p>
             <h2>Ajustar imagen de perfil</h2>
             <div style={{ display: "grid", placeItems: "center", gap: 18, marginTop: 18 }}>
-              <div style={{ width: 260, height: 260, borderRadius: "50%", overflow: "hidden", background: "#F5F5F7", boxShadow: "var(--shadow-soft)", position: "relative" }}>
+              <div style={{ width: 300, height: 300, borderRadius: 24, overflow: "hidden", background: "#FFFFFF", boxShadow: "var(--shadow-soft)", position: "relative", border: "1px solid #E5E5EA" }}>
                 <img
                   src={avatarCrop.source}
                   alt="Vista previa de recorte"
@@ -399,9 +397,19 @@ export function SettingsView() {
                     top: "50%",
                     width: "100%",
                     height: "100%",
-                    objectFit: "cover",
+                    objectFit: "contain",
                     transform: `translate(-50%, -50%) translate(${avatarCrop.x}px, ${avatarCrop.y}px) scale(${avatarCrop.zoom / 100})`,
                     transformOrigin: "center"
+                  }}
+                />
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    inset: 22,
+                    borderRadius: "50%",
+                    border: "2px solid rgba(0, 167, 235, 0.85)",
+                    boxShadow: "0 0 0 999px rgba(245,245,247,0.52)"
                   }}
                 />
               </div>
@@ -416,7 +424,7 @@ export function SettingsView() {
                 </div>
                 <div className="field">
                   <label>Zoom</label>
-                  <input type="range" min="100" max="260" value={avatarCrop.zoom} onChange={(event) => setAvatarCrop({ ...avatarCrop, zoom: Number(event.target.value) })} />
+                  <input type="range" min="60" max="260" value={avatarCrop.zoom} onChange={(event) => setAvatarCrop({ ...avatarCrop, zoom: Number(event.target.value) })} />
                 </div>
               </div>
             </div>

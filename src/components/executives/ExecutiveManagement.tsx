@@ -27,7 +27,7 @@ export function ExecutiveManagement() {
   const [editing, setEditing] = useState<Executive | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
-  const [crop, setCrop] = useState({ x: 50, y: 50, zoom: 100 });
+  const [crop, setCrop] = useState({ x: 0, y: 0, zoom: 100 });
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
@@ -37,7 +37,7 @@ export function ExecutiveManagement() {
     setEditing(executive ?? { ...emptyExecutive, id: crypto.randomUUID() });
     setPhotoFile(null);
     setPhotoPreview(executive?.photoUrl ?? "");
-    setCrop({ x: 50, y: 50, zoom: 100 });
+    setCrop({ x: 0, y: 0, zoom: 100 });
   }
 
   function handlePhoto(file?: File) {
@@ -123,23 +123,33 @@ export function ExecutiveManagement() {
 
             <div className="grid grid-2" style={{ marginTop: 16 }}>
               <div className="card" style={{ boxShadow: "none" }}>
-                <div style={{ width: 260, height: 260, borderRadius: "50%", overflow: "hidden", background: "#eef4f8", margin: "0 auto 18px", display: "grid", placeItems: "center" }}>
+                <div style={{ width: 280, height: 280, borderRadius: 24, overflow: "hidden", background: "#fff", border: "1px solid #E5E5EA", margin: "0 auto 18px", display: "grid", placeItems: "center", position: "relative" }}>
                   {photoPreview ? (
                     <img
                       src={photoPreview}
                       alt="Vista previa"
                       style={{
-                        width: `${crop.zoom}%`,
-                        height: `${crop.zoom}%`,
-                        minWidth: "100%",
-                        minHeight: "100%",
-                        objectFit: "cover",
-                        objectPosition: `${crop.x}% ${crop.y}%`
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        transform: `translate(${crop.x}px, ${crop.y}px) scale(${crop.zoom / 100})`,
+                        transformOrigin: "center"
                       }}
                     />
                   ) : (
                     <div className="muted">Vista previa</div>
                   )}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      inset: 18,
+                      borderRadius: "50%",
+                      border: "2px solid rgba(0, 167, 235, 0.85)",
+                      boxShadow: "0 0 0 999px rgba(245,245,247,0.5)",
+                      pointerEvents: "none"
+                    }}
+                  />
                 </div>
                 <label className="primary-button" style={{ width: "100%" }}>
                   <Upload size={17} />
@@ -148,15 +158,15 @@ export function ExecutiveManagement() {
                 </label>
                 <div className="field" style={{ marginTop: 14 }}>
                   <label>Posicion horizontal</label>
-                  <input type="range" min="0" max="100" value={crop.x} onChange={(event) => setCrop({ ...crop, x: Number(event.target.value) })} />
+                  <input type="range" min="-180" max="180" value={crop.x} onChange={(event) => setCrop({ ...crop, x: Number(event.target.value) })} />
                 </div>
                 <div className="field">
                   <label>Posicion vertical</label>
-                  <input type="range" min="0" max="100" value={crop.y} onChange={(event) => setCrop({ ...crop, y: Number(event.target.value) })} />
+                  <input type="range" min="-180" max="180" value={crop.y} onChange={(event) => setCrop({ ...crop, y: Number(event.target.value) })} />
                 </div>
                 <div className="field">
                   <label>Zoom</label>
-                  <input type="range" min="100" max="180" value={crop.zoom} onChange={(event) => setCrop({ ...crop, zoom: Number(event.target.value) })} />
+                  <input type="range" min="60" max="260" value={crop.zoom} onChange={(event) => setCrop({ ...crop, zoom: Number(event.target.value) })} />
                 </div>
               </div>
 
