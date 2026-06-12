@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export type KommoMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -20,7 +21,7 @@ export class KommoApiError extends Error {
   }
 }
 
-function getKommoBaseUrl() {
+async function getKommoBaseUrl() {
   const explicitBaseUrl = process.env.KOMMO_BASE_URL?.trim();
   const subdomain = process.env.KOMMO_SUBDOMAIN?.trim();
 
@@ -32,20 +33,29 @@ function getKommoBaseUrl() {
     return `https://${subdomain}.kommo.com`;
   }
 
+  const cookieStore = await cookies();
+  const cookieBaseUrl = cookieStore.get("kommo_base_url")?.value;
+  if (cookieBaseUrl) {
+    return cookieBaseUrl.replace(/\/$/, "");
+  }
+
   throw new Error("Missing KOMMO_BASE_URL or KOMMO_SUBDOMAIN.");
 }
 
-function getKommoAccessToken() {
+async function getKommoAccessToken() {
   const token = process.env.KOMMO_ACCESS_TOKEN?.trim();
   if (!token) {
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get("kommo_access_token")?.value;
+    if (cookieToken) return cookieToken;
     throw new Error("Missing KOMMO_ACCESS_TOKEN.");
   }
   return token;
 }
 
-function buildUrl(path: string, query?: URLSearchParams) {
+async function buildUrl(path: string, query?: URLSearchParams) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const url = new URL(`${getKommoBaseUrl()}${normalizedPath}`);
+  const url = new URL(`${await getKommoBaseUrl()}${normalizedPath}`);
   query?.forEach((value, key) => {
     if (value !== "") url.searchParams.set(key, value);
   });
@@ -54,10 +64,10 @@ function buildUrl(path: string, query?: URLSearchParams) {
 
 export async function kommoRequest<T = unknown>(path: string, options: KommoRequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const response = await fetch(buildUrl(path, options.query), {
+  const response = await fetch(await buildUrl(path, options.query), {
     method,
     headers: {
-      Authorization: `Bearer ${getKommoAccessToken()}`,
+      Authorization: `Bearer ${await getKommoAccessToken()}`,
       Accept: "application/json",
       ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
       ...options.headers
