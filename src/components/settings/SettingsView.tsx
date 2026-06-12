@@ -32,6 +32,18 @@ function isExecutiveRole(role: string) {
   return role.toLowerCase().includes("ejecutivo") || role.toLowerCase().includes("lider");
 }
 
+function dedupeUsersByEmail(users: UserProfile[]) {
+  const byEmail = new Map<string, UserProfile>();
+  users.forEach((user) => {
+    const key = user.email.trim().toLowerCase() || user.id;
+    const existing = byEmail.get(key);
+    if (!existing || existing.id.startsWith("user-") || existing.id.startsWith("draft-")) {
+      byEmail.set(key, user);
+    }
+  });
+  return Array.from(byEmail.values());
+}
+
 function blankUser(): EditableUser {
   return {
     id: `draft-${Date.now()}`,
@@ -58,8 +70,33 @@ export function SettingsView() {
   const [saving, setSaving] = useState(false);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadUsers() {
+      try {
+        const response = await fetch("/api/admin/users", { cache: "no-store" });
+        const payload = (await response.json()) as { ok?: boolean; data?: { users?: UserProfile[] } };
+        if (!alive || !response.ok || !payload.ok || !payload.data?.users) return;
+        setState((current) => {
+          const next = { ...current, users: dedupeUsersByEmail(payload.data?.users ?? []) };
+          setCommercialState(next);
+          return next;
+        });
+      } catch {
+        // Mantiene la lista local si la sesion no puede leer usuarios administrativos.
+      }
+    }
+    loadUsers();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const users = useMemo(
-    () => state.users.filter((user) => `${user.fullName} ${user.email} ${user.area} ${user.role}`.toLowerCase().includes(query.toLowerCase())),
+    () =>
+      dedupeUsersByEmail(state.users).filter((user) =>
+        `${user.fullName} ${user.email} ${user.area} ${user.role}`.toLowerCase().includes(query.toLowerCase())
+      ),
     [query, state.users]
   );
 
@@ -121,7 +158,8 @@ export function SettingsView() {
   }
 
   function applyUserLocally(user: UserProfile, executiveId?: string | null) {
-    const exists = state.users.some((item) => item.id === user.id);
+    const normalizedEmail = user.email.trim().toLowerCase();
+    const exists = state.users.some((item) => item.id === user.id || item.email.trim().toLowerCase() === normalizedEmail);
     const executives = [...state.executives];
 
     if (isExecutiveRole(user.role)) {
@@ -148,7 +186,11 @@ export function SettingsView() {
 
     const next = {
       ...state,
-      users: exists ? state.users.map((item) => (item.id === user.id ? user : item)) : [user, ...state.users],
+      users: dedupeUsersByEmail(
+        exists
+          ? state.users.map((item) => (item.id === user.id || item.email.trim().toLowerCase() === normalizedEmail ? { ...item, ...user } : item))
+          : [user, ...state.users]
+      ),
       executives,
       audit: [
         {
@@ -218,8 +260,8 @@ export function SettingsView() {
   return (
     <div className="grid">
       <section className="grid grid-4">
-        <div className="card metric"><span className="muted">Usuarios activos</span><strong>{state.users.filter((u) => u.status === "Activo").length}</strong></div>
-        <div className="card metric"><span className="muted">Usuarios inactivos</span><strong>{state.users.filter((u) => u.status !== "Activo").length}</strong></div>
+        <div className="card metric"><span className="muted">Usuarios activos</span><strong>{users.filter((u) => u.status === "Activo").length}</strong></div>
+        <div className="card metric"><span className="muted">Usuarios inactivos</span><strong>{users.filter((u) => u.status !== "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Roles creados</span><strong>{roles.length}</strong></div>
         <div className="card metric"><span className="muted">Ejecutivos vinculados</span><strong>{state.executives.length}</strong></div>
       </section>

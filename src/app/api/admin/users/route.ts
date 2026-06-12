@@ -49,6 +49,19 @@ function normalizeProfileRole(role = "Ejecutivo") {
   return "ejecutivo";
 }
 
+function roleLabel(role = "ejecutivo") {
+  const normalized = normalizeProfileRole(role);
+  const labels: Record<string, string> = {
+    admin_sistema: "Superadministrador",
+    gerencia: "Gerencia",
+    jefe_ventas: "Jefe de ventas",
+    lider_ventas: "Lider de ventas",
+    ejecutivo: "Ejecutivo",
+    marketing_soporte: "Marketing"
+  };
+  return labels[normalized] ?? "Ejecutivo";
+}
+
 function isUuid(value?: string) {
   return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));
 }
@@ -134,6 +147,84 @@ async function requireAdmin() {
   }
 
   return { ok: true as const, userId: user.id };
+}
+
+export async function GET() {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  try {
+    const admin = createAdminClient();
+    const authUsers = [];
+    const perPage = 50;
+
+    for (let page = 1; page <= 200; page += 1) {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+      if (error) throw error;
+      authUsers.push(...data.users);
+
+      const lastPage = Number((data as { lastPage?: number }).lastPage ?? 0);
+      if (!data.users.length || (lastPage > 0 ? page >= lastPage : data.users.length < perPage)) break;
+    }
+
+    const ids = authUsers.map((user) => user.id);
+    const { data: profiles, error: profileError } = ids.length
+      ? await admin.from("profiles").select("id, full_name, role, avatar_url, active, created_at").in("id", ids)
+      : { data: [], error: null };
+    if (profileError) throw profileError;
+
+    const { data: executives, error: executiveError } = ids.length
+      ? await admin.from("executives").select("id, profile_id, code, shift, status").in("profile_id", ids)
+      : { data: [], error: null };
+    if (executiveError) throw executiveError;
+
+    const executiveIds = (executives ?? []).map((executive) => executive.id);
+    const { data: memberships, error: membershipError } = executiveIds.length
+      ? await admin.from("team_members").select("team_id, executive_id").in("executive_id", executiveIds).eq("active", true)
+      : { data: [], error: null };
+    if (membershipError) throw membershipError;
+
+    const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+    const executiveByProfile = new Map((executives ?? []).map((executive) => [executive.profile_id, executive]));
+    const membershipByExecutive = new Map((memberships ?? []).map((membership) => [membership.executive_id, membership]));
+    const seenEmails = new Set<string>();
+
+    const users = authUsers
+      .map((authUser) => {
+        const email = authUser.email?.trim().toLowerCase();
+        if (!email || seenEmails.has(email)) return null;
+        seenEmails.add(email);
+
+        const profile = profileById.get(authUser.id);
+        const executive = executiveByProfile.get(authUser.id);
+        const membership = executive?.id ? membershipByExecutive.get(executive.id) : null;
+        const metadata = authUser.user_metadata ?? {};
+        const role = roleLabel(String(profile?.role ?? metadata.role ?? "ejecutivo"));
+        const fullName = String(profile?.full_name ?? metadata.full_name ?? authUser.email ?? "Usuario");
+
+        return {
+          id: authUser.id,
+          fullName,
+          email,
+          role,
+          area: String(metadata.area ?? (role.includes("Jefe") || role.includes("Gerencia") ? "Gerencia Comercial" : "Ventas")),
+          status: profile?.active === false ? "Inactivo" : "Activo",
+          lastAccess: authUser.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString("es-PE") : "Sin acceso",
+          createdAt: profile?.created_at ? String(profile.created_at).slice(0, 10) : String(authUser.created_at ?? "").slice(0, 10),
+          avatarUrl: profile?.avatar_url ?? metadata.avatar_url ?? undefined,
+          code: executive?.code ?? "",
+          shift: executive?.shift ?? "Manana",
+          teamId: membership?.team_id ?? ""
+        };
+      })
+      .filter(Boolean);
+
+    return NextResponse.json({ ok: true, data: { users } });
+  } catch (error) {
+    const message = getErrorMessage(error, "No se pudo cargar usuarios.");
+    console.error("Error en GET /api/admin/users", error);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
