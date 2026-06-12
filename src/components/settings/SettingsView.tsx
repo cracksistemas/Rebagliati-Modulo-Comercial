@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Camera, Lock, Send, ShieldCheck, UserPlus } from "lucide-react";
+import { Bell, Camera, Download, Lock, Send, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
@@ -32,6 +32,15 @@ type AvatarCropDraft = {
 type SessionProfile = {
   email?: string;
   role?: string;
+};
+
+type ProvisionedAccess = {
+  executiveId: string;
+  fullName: string;
+  email: string;
+  password: string;
+  role: string;
+  status: string;
 };
 
 function isExecutiveRole(role: string) {
@@ -134,6 +143,9 @@ export function SettingsView() {
   const [selectedRole, setSelectedRole] = useState("Ejecutivo");
   const [sessionProfile, setSessionProfile] = useState<SessionProfile | null>(null);
   const [settingsStatus, setSettingsStatus] = useState("");
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionedAccesses, setProvisionedAccesses] = useState<ProvisionedAccess[]>([]);
+  const [showProvisionModal, setShowProvisionModal] = useState(false);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   useEffect(() => {
@@ -381,6 +393,57 @@ export function SettingsView() {
     }
   }
 
+  async function refreshRemoteUsers() {
+    const response = await fetch("/api/admin/users", { cache: "no-store" });
+    const payload = (await response.json()) as { ok?: boolean; data?: { users?: UserProfile[] }; error?: string };
+    if (!response.ok || !payload.ok || !payload.data?.users) {
+      throw new Error(payload.error ?? "No se pudieron cargar usuarios.");
+    }
+    setState((current) => {
+      const remoteUsers = dedupeUsersByEmail(payload.data?.users ?? []);
+      const next = stripDemoCommercialData(current, remoteUsers);
+      setCommercialState(next);
+      return next;
+    });
+  }
+
+  async function provisionExecutiveAccesses() {
+    setProvisioning(true);
+    setSettingsStatus("Provisionando accesos de ejecutivos...");
+    try {
+      const response = await fetch("/api/admin/provision-executives", { method: "POST" });
+      const payload = (await response.json()) as { ok?: boolean; error?: string; data?: { credentials?: ProvisionedAccess[] } };
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "No se pudieron provisionar accesos.");
+      const credentials = payload.data?.credentials ?? [];
+      setProvisionedAccesses(credentials);
+      setShowProvisionModal(true);
+      await refreshRemoteUsers();
+      setSettingsStatus(`${credentials.length} accesos provisionados.`);
+    } catch (error) {
+      setSettingsStatus(error instanceof Error ? error.message : "No se pudieron provisionar accesos.");
+    } finally {
+      setProvisioning(false);
+    }
+  }
+
+  function provisionCsv() {
+    const rows = [
+      ["Nombre", "Correo", "Contrasena temporal", "Rol", "Estado"],
+      ...provisionedAccesses.map((item) => [item.fullName, item.email, item.password, item.role, item.status])
+    ];
+    return rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+  }
+
+  function downloadProvisionCsv() {
+    const blob = new Blob([provisionCsv()], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "accesos-ejecutivos-rebagliati.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function persistAdminSettings(discounts: AuthorizedDiscount[], rolePermissions: RolePermissionConfig[], notifications = state.notifications) {
     const response = await fetch("/api/admin/settings", {
       method: "POST",
@@ -554,10 +617,16 @@ export function SettingsView() {
             <h2>Usuarios, roles y auditoria</h2>
             <p className="muted">Al crear un usuario ejecutivo, tambien se crea su registro comercial vinculado.</p>
           </div>
-          <button className="primary-button" onClick={() => openEditor()}>
-            <UserPlus size={18} />
-            Crear usuario
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button className="ghost-button" onClick={provisionExecutiveAccesses} disabled={!canEditRules || provisioning}>
+              <UsersRound size={18} />
+              {provisioning ? "Provisionando..." : "Provisionar accesos"}
+            </button>
+            <button className="primary-button" onClick={() => openEditor()}>
+              <UserPlus size={18} />
+              Crear usuario
+            </button>
+          </div>
         </div>
         <div className="field" style={{ marginTop: 12 }}>
           <label>Buscar por nombre, correo, area o rol</label>
@@ -809,6 +878,36 @@ export function SettingsView() {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
               <button className="ghost-button" onClick={() => setAvatarCrop(null)}>Cancelar</button>
               <button className="primary-button" onClick={applyAvatarCrop}>Usar recorte</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProvisionModal && (
+        <div className="modal-backdrop">
+          <div className="modal" style={{ width: "min(920px, 96vw)" }}>
+            <p className="eyebrow">Accesos provisionados</p>
+            <h2>Usuarios creados o actualizados</h2>
+            <p className="muted">Estos accesos ya quedaron vinculados a Supabase Auth, perfiles y directorio comercial.</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+              <button className="ghost-button" onClick={downloadProvisionCsv}><Download size={16} /> Descargar CSV</button>
+            </div>
+            <table className="table">
+              <thead><tr><th>Ejecutivo</th><th>Correo</th><th>Contrasena temporal</th><th>Rol</th><th>Estado</th></tr></thead>
+              <tbody>
+                {provisionedAccesses.map((item) => (
+                  <tr key={`${item.email}-${item.executiveId}`}>
+                    <td><strong>{item.fullName}</strong></td>
+                    <td>{item.email}</td>
+                    <td><code>{item.password}</code></td>
+                    <td>{item.role}</td>
+                    <td><span className="badge">{item.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+              <button className="primary-button" onClick={() => setShowProvisionModal(false)}>Cerrar</button>
             </div>
           </div>
         </div>
