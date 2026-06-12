@@ -27,6 +27,32 @@ function asArray<T>(value: unknown, fallback: T[]) {
 
 function normalizeState(value: Partial<CommercialState> | null | undefined): CommercialState {
   const source = value ?? {};
+  const defaultExecutive: Executive = {
+    id: "executive-empty",
+    fullName: "Ejecutivo",
+    code: "",
+    teamId: "",
+    shift: "Manana",
+    status: "Activo",
+    goalAmount: 0,
+    currentSales: 0,
+    points: 0
+  };
+  const defaultSale: Sale = {
+    id: "sale-empty",
+    saleDate: new Date().toISOString().slice(0, 10),
+    executiveId: "",
+    teamId: "",
+    productType: "Curso",
+    productName: "",
+    quantity: 0,
+    grossAmount: 0,
+    discountAmount: 0,
+    netAmount: 0,
+    leadSource: "WhatsApp",
+    paymentMethod: "Transferencia",
+    validationStatus: "pendiente_validacion"
+  };
   const teams = asArray<Team>(source.teams, seedState.teams).map((team, index) => {
     const seedTeam = seedState.teams[index] ?? seedState.teams[0];
     return {
@@ -40,7 +66,7 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
   });
 
   const executives: Executive[] = asArray<Executive>(source.executives, seedState.executives).map((executive, index) => {
-    const seedExecutive = seedState.executives[index] ?? seedState.executives[0];
+    const seedExecutive = seedState.executives[index] ?? seedState.executives[0] ?? defaultExecutive;
     const shift: Executive["shift"] =
       executive.shift === "Tarde" || executive.shift === "Noche" ? executive.shift : "Manana";
     const status: Executive["status"] =
@@ -61,7 +87,7 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
   });
 
   const sales: Sale[] = asArray<Sale>(source.sales, seedState.sales).map((sale, index) => {
-    const seedSale = seedState.sales[index] ?? seedState.sales[0];
+    const seedSale = seedState.sales[index] ?? seedState.sales[0] ?? defaultSale;
     const productType: Sale["productType"] =
       sale.productType === "Curso Modular" || sale.productType === "Diplomado" ? sale.productType : "Curso";
     const validationStatus: Sale["validationStatus"] =

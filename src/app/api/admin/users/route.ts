@@ -259,6 +259,7 @@ export async function GET() {
           lastAccess: authUser.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString("es-PE") : "Sin acceso",
           createdAt: profile?.created_at ? String(profile.created_at).slice(0, 10) : String(authUser.created_at ?? "").slice(0, 10),
           avatarUrl: await resolveAvatarUrl(admin, rawAvatarUrl),
+          executiveId: executive?.id ?? "",
           code: executive?.code ?? "",
           shift: executive?.shift ?? "Manana",
           teamId: membership?.team_id ?? ""

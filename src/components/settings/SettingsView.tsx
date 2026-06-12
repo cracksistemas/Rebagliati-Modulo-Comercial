@@ -55,6 +55,46 @@ function dedupeUsersByEmail(users: UserProfile[]) {
   return Array.from(byEmail.values());
 }
 
+const demoExecutiveIds = new Set(["exec-1", "exec-2", "exec-3"]);
+const demoSaleIds = new Set(["sale-1", "sale-2", "sale-3"]);
+const demoIncidentIds = new Set(["incident-1"]);
+
+function executivesFromUsers(users: UserProfile[], existing: Executive[]) {
+  const existingById = new Map(existing.map((executive) => [executive.id, executive]));
+  return users
+    .filter((user) => (user.executiveId || isExecutiveRole(user.role)) && user.status !== "Archivado")
+    .map((user, index) => {
+      const executiveId = user.executiveId || user.id;
+      const previous = existingById.get(executiveId) ?? existingById.get(user.id);
+      return {
+        id: executiveId,
+        fullName: user.fullName,
+        code: user.code || previous?.code || `E-${String(index + 1).padStart(3, "0")}`,
+        teamId: user.teamId || previous?.teamId,
+        shift: user.shift ?? previous?.shift ?? "Manana",
+        status: user.status === "Activo" || user.status === "Pendiente" ? "Activo" as const : "Inactivo" as const,
+        photoUrl: user.avatarUrl ?? previous?.photoUrl,
+        goalAmount: previous?.goalAmount ?? 0,
+        currentSales: previous?.currentSales ?? 0,
+        points: previous?.points ?? 0,
+        previousRank: previous?.previousRank ?? 99
+      };
+    });
+}
+
+function stripDemoCommercialData(current: ReturnType<typeof getCommercialState>, users: UserProfile[]) {
+  const cleanExecutives = executivesFromUsers(users, current.executives.filter((executive) => !demoExecutiveIds.has(executive.id)));
+  const validExecutiveIds = new Set(cleanExecutives.map((executive) => executive.id));
+  return {
+    ...current,
+    users,
+    executives: cleanExecutives,
+    teams: current.teams.map((team) => demoExecutiveIds.has(team.leaderId ?? "") ? { ...team, leaderId: undefined } : team),
+    sales: current.sales.filter((sale) => !demoSaleIds.has(sale.id) && validExecutiveIds.has(sale.executiveId)),
+    incidents: current.incidents.filter((incident) => !demoIncidentIds.has(incident.id) && validExecutiveIds.has(incident.executiveId))
+  };
+}
+
 function blankUser(): EditableUser {
   return {
     id: `draft-${Date.now()}`,
@@ -104,7 +144,8 @@ export function SettingsView() {
         const payload = (await response.json()) as { ok?: boolean; data?: { users?: UserProfile[] } };
         if (!alive || !response.ok || !payload.ok || !payload.data?.users) return;
         setState((current) => {
-          const next = { ...current, users: dedupeUsersByEmail(payload.data?.users ?? []) };
+          const remoteUsers = dedupeUsersByEmail(payload.data?.users ?? []);
+          const next = stripDemoCommercialData(current, remoteUsers);
           setCommercialState(next);
           return next;
         });

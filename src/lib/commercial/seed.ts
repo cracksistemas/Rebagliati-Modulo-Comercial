@@ -10,91 +10,8 @@ export const seedState: CommercialState = {
     { id: "team-guinda", name: "Equipo Guinda", color: "#7B1238", leaderId: "exec-2", goalAmount: 38000, active: true },
     { id: "team-verde", name: "Equipo Verde", color: "#34C759", leaderId: "exec-3", goalAmount: 40000, active: true }
   ],
-  executives: [
-    {
-      id: "exec-1",
-      fullName: "Eliana Benavides",
-      code: "E-019",
-      teamId: "team-azul",
-      shift: "Manana",
-      status: "Activo",
-      goalAmount: 28000,
-      currentSales: 32400,
-      points: 245,
-      previousRank: 3
-    },
-    {
-      id: "exec-2",
-      fullName: "Anarosa Bustamante",
-      code: "E-086",
-      teamId: "team-guinda",
-      shift: "Tarde",
-      status: "Activo",
-      goalAmount: 24000,
-      currentSales: 28750,
-      points: 221,
-      previousRank: 1
-    },
-    {
-      id: "exec-3",
-      fullName: "Mariana Haro",
-      code: "E-044",
-      teamId: "team-verde",
-      shift: "Manana",
-      status: "Activo",
-      goalAmount: 23000,
-      currentSales: 13350,
-      points: 134,
-      previousRank: 4
-    }
-  ],
-  sales: [
-    {
-      id: "sale-1",
-      saleDate: "2026-06-10",
-      executiveId: "exec-1",
-      teamId: "team-azul",
-      productType: "Diplomado",
-      productName: "Diplomado en Salud Ocupacional",
-      quantity: 6,
-      grossAmount: 18000,
-      discountAmount: 900,
-      netAmount: 17100,
-      leadSource: "WhatsApp",
-      paymentMethod: "Transferencia",
-      validationStatus: "validada"
-    },
-    {
-      id: "sale-2",
-      saleDate: "2026-06-11",
-      executiveId: "exec-2",
-      teamId: "team-guinda",
-      productType: "Curso Modular",
-      productName: "Emergencias y Desastres",
-      quantity: 8,
-      grossAmount: 12800,
-      discountAmount: 650,
-      netAmount: 12150,
-      leadSource: "Meta Ads",
-      paymentMethod: "Yape",
-      validationStatus: "validada"
-    },
-    {
-      id: "sale-3",
-      saleDate: "2026-06-11",
-      executiveId: "exec-3",
-      teamId: "team-verde",
-      productType: "Curso",
-      productName: "Inyectoterapia",
-      quantity: 5,
-      grossAmount: 4500,
-      discountAmount: 200,
-      netAmount: 4300,
-      leadSource: "Base",
-      paymentMethod: "Tarjeta",
-      validationStatus: "pendiente_validacion"
-    }
-  ],
+  executives: [],
+  sales: [],
   users: [
     {
       id: "user-admin",
@@ -113,30 +30,7 @@ export const seedState: CommercialState = {
   paymentMethods: defaultPaymentMethods,
   discounts: defaultDiscounts,
   rolePermissions: defaultRolePermissions,
-  incidents: [
-    {
-      id: "incident-1",
-      incidentCode: "INC-2026-0001",
-      incidentDate: "2026-06-11",
-      executiveId: "exec-2",
-      executiveName: "Anarosa Bustamante",
-      salesLeaderId: "exec-1",
-      salesLeaderName: "Eliana Benavides",
-      description: "Mensaje de seguimiento respondido fuera del tiempo esperado en Kommo.",
-      severity: "Moderada",
-      category: "Tiempo de respuesta",
-      status: "En revision",
-      solutionOrMeasure: "Conversacion correctiva pendiente de cierre.",
-      disciplinaryActionType: "Conversacion correctiva",
-      pointsDeducted: 3,
-      kommoLeadId: "KMO-2145",
-      courseOrProgram: "Emergencias y Desastres",
-      channel: "WhatsApp",
-      createdBy: "Administrador Comercial",
-      createdAt: "2026-06-11 16:20",
-      isRecurrent: false
-    }
-  ],
+  incidents: [],
   incidentCriteria: defaultIncidentCriteria,
   notifications: [
     {

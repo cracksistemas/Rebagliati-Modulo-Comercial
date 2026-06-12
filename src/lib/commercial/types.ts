@@ -51,6 +51,7 @@ export type UserProfile = {
   lastAccess: string;
   createdAt: string;
   avatarUrl?: string;
+  executiveId?: string;
   code?: string;
   shift?: "Manana" | "Tarde" | "Noche";
   teamId?: string;
