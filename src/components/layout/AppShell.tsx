@@ -39,6 +39,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
+
   const title = useMemo(() => {
     if (pathname.includes("customer-map")) return "Mapa de Clientes";
     if (pathname.includes("settings")) return "Configuracion";
