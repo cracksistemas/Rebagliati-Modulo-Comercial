@@ -87,12 +87,17 @@ function isEmailAlreadyRegistered(error: unknown) {
 
 async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, email: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+  const perPage = 50;
+  for (let page = 1; page <= 200; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
     if (error) throw error;
     const user = data.users.find((item) => item.email?.toLowerCase() === normalizedEmail);
     if (user) return user;
-    if (!data.users.length || data.users.length < 1000) return null;
+
+    const lastPage = Number((data as { lastPage?: number }).lastPage ?? 0);
+    if (!data.users.length || (lastPage > 0 ? page >= lastPage : data.users.length < perPage)) {
+      return null;
+    }
   }
   return null;
 }

@@ -72,7 +72,7 @@ export function SettingsView() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setAvatarCrop({ source: String(reader.result), x: 50, y: 50, zoom: 115 });
+      setAvatarCrop({ source: String(reader.result), x: 0, y: 0, zoom: 115 });
     };
     reader.readAsDataURL(file);
   }
@@ -94,8 +94,10 @@ export function SettingsView() {
         const coverScale = Math.max(outputSize / image.width, outputSize / image.height) * (draft.zoom / 100);
         const sourceWidth = outputSize / coverScale;
         const sourceHeight = outputSize / coverScale;
-        const sourceX = Math.max(0, Math.min(image.width - sourceWidth, (image.width - sourceWidth) * (draft.x / 100)));
-        const sourceY = Math.max(0, Math.min(image.height - sourceHeight, (image.height - sourceHeight) * (draft.y / 100)));
+        const centerX = (image.width - sourceWidth) / 2;
+        const centerY = (image.height - sourceHeight) / 2;
+        const sourceX = Math.max(0, Math.min(image.width - sourceWidth, centerX - draft.x / coverScale));
+        const sourceY = Math.max(0, Math.min(image.height - sourceHeight, centerY - draft.y / coverScale));
 
         ctx.fillStyle = "#FFFFFF";
         ctx.fillRect(0, 0, outputSize, outputSize);
@@ -345,32 +347,34 @@ export function SettingsView() {
             <p className="eyebrow">Recorte de foto</p>
             <h2>Ajustar imagen de perfil</h2>
             <div style={{ display: "grid", placeItems: "center", gap: 18, marginTop: 18 }}>
-              <div style={{ width: 260, height: 260, borderRadius: "50%", overflow: "hidden", background: "#F5F5F7", boxShadow: "var(--shadow-soft)" }}>
+              <div style={{ width: 260, height: 260, borderRadius: "50%", overflow: "hidden", background: "#F5F5F7", boxShadow: "var(--shadow-soft)", position: "relative" }}>
                 <img
                   src={avatarCrop.source}
                   alt="Vista previa de recorte"
                   style={{
-                    width: `${avatarCrop.zoom}%`,
-                    height: `${avatarCrop.zoom}%`,
-                    minWidth: "100%",
-                    minHeight: "100%",
+                    position: "absolute",
+                    left: "50%",
+                    top: "50%",
+                    width: "100%",
+                    height: "100%",
                     objectFit: "cover",
-                    objectPosition: `${avatarCrop.x}% ${avatarCrop.y}%`
+                    transform: `translate(-50%, -50%) translate(${avatarCrop.x}px, ${avatarCrop.y}px) scale(${avatarCrop.zoom / 100})`,
+                    transformOrigin: "center"
                   }}
                 />
               </div>
               <div className="form-grid" style={{ width: "100%" }}>
                 <div className="field">
                   <label>Horizontal</label>
-                  <input type="range" min="0" max="100" value={avatarCrop.x} onChange={(event) => setAvatarCrop({ ...avatarCrop, x: Number(event.target.value) })} />
+                  <input type="range" min="-180" max="180" value={avatarCrop.x} onChange={(event) => setAvatarCrop({ ...avatarCrop, x: Number(event.target.value) })} />
                 </div>
                 <div className="field">
                   <label>Vertical</label>
-                  <input type="range" min="0" max="100" value={avatarCrop.y} onChange={(event) => setAvatarCrop({ ...avatarCrop, y: Number(event.target.value) })} />
+                  <input type="range" min="-180" max="180" value={avatarCrop.y} onChange={(event) => setAvatarCrop({ ...avatarCrop, y: Number(event.target.value) })} />
                 </div>
                 <div className="field">
                   <label>Zoom</label>
-                  <input type="range" min="100" max="190" value={avatarCrop.zoom} onChange={(event) => setAvatarCrop({ ...avatarCrop, zoom: Number(event.target.value) })} />
+                  <input type="range" min="100" max="260" value={avatarCrop.zoom} onChange={(event) => setAvatarCrop({ ...avatarCrop, zoom: Number(event.target.value) })} />
                 </div>
               </div>
             </div>
