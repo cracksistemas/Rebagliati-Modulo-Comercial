@@ -6,6 +6,7 @@ import { seedState } from "./seed";
 import type { CommercialState, Executive, Sale, Team } from "./types";
 
 const STORAGE_KEY = "reba-commercial-state";
+const SETTINGS_LOCK_MIGRATION_KEY = "reba-settings-superadmin-only-v1";
 
 function canUseStorage() {
   return typeof window !== "undefined";
@@ -114,7 +115,18 @@ export function getCommercialState(): CommercialState {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seedState));
       return seedState;
     }
-    const normalized = normalizeState(JSON.parse(raw));
+    let normalized = normalizeState(JSON.parse(raw));
+    if (!window.localStorage.getItem(SETTINGS_LOCK_MIGRATION_KEY)) {
+      normalized = {
+        ...normalized,
+        rolePermissions: normalized.rolePermissions.map((config) =>
+          config.role === "Superadministrador"
+            ? config
+            : { ...config, permissions: config.permissions.filter((permission) => !permission.startsWith("settings.")) }
+        )
+      };
+      window.localStorage.setItem(SETTINGS_LOCK_MIGRATION_KEY, "done");
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   } catch {

@@ -22,13 +22,7 @@ type CreateUserPayload = {
 
 function isAdminRole(role = "") {
   const normalized = role.toLowerCase();
-  return (
-    normalized.includes("superadministrador") ||
-    normalized.includes("administrador") ||
-    normalized.includes("admin_sistema") ||
-    normalized.includes("gerencia") ||
-    normalized.includes("jefe")
-  );
+  return normalized.includes("superadministrador") || normalized.includes("admin_sistema");
 }
 
 function isExecutiveRole(role = "") {

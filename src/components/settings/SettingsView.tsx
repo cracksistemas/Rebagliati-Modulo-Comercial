@@ -43,13 +43,18 @@ type AvatarCropDraft = {
   zoom: number;
 };
 
+type SessionProfile = {
+  email?: string;
+  role?: string;
+};
+
 function isExecutiveRole(role: string) {
   return role.toLowerCase().includes("ejecutivo") || role.toLowerCase().includes("lider");
 }
 
 function canManageCommercialRules(role: string) {
   const normalized = role.toLowerCase();
-  return normalized.includes("super") || normalized.includes("admin") || normalized.includes("jefe") || normalized.includes("gerencia") || normalized.includes("encargado");
+  return normalized.includes("super") || normalized.includes("admin_sistema");
 }
 
 function dedupeUsersByEmail(users: UserProfile[]) {
@@ -90,6 +95,7 @@ export function SettingsView() {
   const [saving, setSaving] = useState(false);
   const [discountDraft, setDiscountDraft] = useState<AuthorizedDiscount>({ id: "", label: "", amount: 0, active: true });
   const [selectedRole, setSelectedRole] = useState("Ejecutivo");
+  const [sessionProfile, setSessionProfile] = useState<SessionProfile | null>(null);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   useEffect(() => {
@@ -114,6 +120,25 @@ export function SettingsView() {
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadSessionProfile() {
+      try {
+        const response = await fetch("/api/session/me", { cache: "no-store" });
+        const payload = (await response.json()) as { ok?: boolean; data?: SessionProfile };
+        if (alive && response.ok && payload.ok && payload.data) {
+          setSessionProfile(payload.data);
+        }
+      } catch {
+        setSessionProfile(null);
+      }
+    }
+    loadSessionProfile();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const users = useMemo(
     () =>
       dedupeUsersByEmail(state.users).filter((user) =>
@@ -121,7 +146,7 @@ export function SettingsView() {
       ),
     [query, state.users]
   );
-  const currentAdminRole = dedupeUsersByEmail(state.users).find((user) => user.email === "admin@test.com")?.role ?? "Superadministrador";
+  const currentAdminRole = sessionProfile?.role ?? dedupeUsersByEmail(state.users).find((user) => user.email === "admin@test.com")?.role ?? "";
   const canEditRules = canManageCommercialRules(currentAdminRole);
 
   function openEditor(user?: UserProfile) {

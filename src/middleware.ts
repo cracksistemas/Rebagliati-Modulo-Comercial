@@ -28,15 +28,14 @@ function isApiPath(pathname: string) {
 
 function isBlockedByRole(pathname: string, role = "") {
   const normalized = role.toLowerCase();
+  const isSuperAdmin = normalized.includes("superadministrador") || normalized.includes("admin_sistema");
 
   if (pathname.startsWith("/api/admin")) {
-    return !(
-      normalized.includes("superadministrador") ||
-      normalized.includes("administrador") ||
-      normalized.includes("admin_sistema") ||
-      normalized.includes("gerencia") ||
-      normalized.includes("jefe")
-    );
+    return !isSuperAdmin;
+  }
+
+  if (pathname.startsWith("/settings")) {
+    return !isSuperAdmin;
   }
 
   if (normalized.includes("ejecutivo") && !normalized.includes("lider")) {

@@ -122,8 +122,8 @@ export const seedState: CommercialState = {
   ],
   rolePermissions: [
     { role: "Superadministrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export", "settings.users", "settings.roles", "settings.discounts"] },
-    { role: "Administrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export", "settings.users", "settings.roles", "settings.discounts"] },
-    { role: "Jefe de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export", "settings.discounts"] },
+    { role: "Administrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export"] },
+    { role: "Jefe de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "executives.manage", "goals.manage", "customer-map.view", "reports.export"] },
     { role: "Lider de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "ranking.executives", "teams.view", "customer-map.view", "reports.export"] },
     { role: "Ejecutivo", permissions: ["dashboard.resumen", "sales.new", "ranking.executives", "teams.view", "customer-map.view"] },
     { role: "Marketing", permissions: ["dashboard.resumen", "ranking.executives", "teams.view", "customer-map.view", "reports.export"] },
