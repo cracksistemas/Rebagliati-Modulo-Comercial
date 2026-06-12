@@ -67,6 +67,22 @@ function getErrorMessage(error: unknown, fallback = "No se pudo crear el usuario
   return fallback;
 }
 
+function isEmailAlreadyRegistered(error: unknown) {
+  return getErrorMessage(error, "").toLowerCase().includes("already been registered");
+}
+
+async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const user = data.users.find((item) => item.email?.toLowerCase() === normalizedEmail);
+    if (user) return user;
+    if (!data.users.length || data.users.length < 1000) return null;
+  }
+  return null;
+}
+
 async function uploadAvatar(admin: ReturnType<typeof createAdminClient>, userId: string, avatarDataUrl?: string) {
   const parsed = parseDataUrl(avatarDataUrl);
   if (!parsed) return null;
@@ -118,17 +134,34 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient();
     const shouldCreate = !isUuid(payload.id);
     const password = payload.password?.trim();
+    const email = payload.email.trim();
 
-    if (shouldCreate && !password) {
+    stage = "buscar usuario existente por correo";
+    const existingAuthUser = shouldCreate ? await findAuthUserByEmail(admin, email) : null;
+
+    if (shouldCreate && !existingAuthUser && !password) {
       return NextResponse.json({ ok: false, error: "La contrasena inicial es obligatoria para crear el acceso." }, { status: 400 });
     }
 
     let userId = payload.id;
 
-    if (shouldCreate) {
+    if (shouldCreate && existingAuthUser) {
+      userId = existingAuthUser.id;
+      stage = "vincular usuario existente en Supabase Auth";
+      const { error } = await admin.auth.admin.updateUserById(userId, {
+        email,
+        password: password || undefined,
+        user_metadata: {
+          full_name: payload.fullName.trim(),
+          role: payload.role,
+          area: payload.area ?? "Ventas"
+        }
+      });
+      if (error) throw error;
+    } else if (shouldCreate) {
       stage = "crear usuario en Supabase Auth";
       const { data, error } = await admin.auth.admin.createUser({
-        email: payload.email.trim(),
+        email,
         password,
         email_confirm: true,
         user_metadata: {
@@ -137,12 +170,33 @@ export async function POST(request: NextRequest) {
           area: payload.area ?? "Ventas"
         }
       });
-      if (error) throw error;
-      userId = data.user.id;
+      if (error) {
+        if (isEmailAlreadyRegistered(error)) {
+          stage = "recuperar usuario existente en Supabase Auth";
+          const existingUser = await findAuthUserByEmail(admin, email);
+          if (!existingUser) throw new Error("El correo ya existe en Supabase Auth, pero no se pudo recuperar para vincularlo.");
+          userId = existingUser.id;
+          stage = "vincular usuario existente en Supabase Auth";
+          const { error: updateExistingError } = await admin.auth.admin.updateUserById(userId, {
+            email,
+            password: password || undefined,
+            user_metadata: {
+              full_name: payload.fullName.trim(),
+              role: payload.role,
+              area: payload.area ?? "Ventas"
+            }
+          });
+          if (updateExistingError) throw updateExistingError;
+        } else {
+          throw error;
+        }
+      } else {
+        userId = data.user.id;
+      }
     } else if (userId) {
       stage = "actualizar usuario en Supabase Auth";
       const { error } = await admin.auth.admin.updateUserById(userId, {
-        email: payload.email.trim(),
+        email,
         password: password || undefined,
         user_metadata: {
           full_name: payload.fullName.trim(),
@@ -215,10 +269,10 @@ export async function POST(request: NextRequest) {
     const { error: auditError } = await admin.from("audit_logs").insert({
       table_name: "profiles",
       record_id: userId,
-      action: shouldCreate ? "create_user" : "update_user",
+      action: shouldCreate && existingAuthUser ? "link_existing_user" : shouldCreate ? "create_user" : "update_user",
       user_id: guard.userId,
       new_data: {
-        email: payload.email,
+        email,
         role: payload.role,
         executive_id: executiveId
       }
@@ -232,7 +286,7 @@ export async function POST(request: NextRequest) {
       data: {
         id: userId,
         fullName: payload.fullName,
-        email: payload.email,
+        email,
         role: payload.role,
         area: payload.area ?? "Ventas",
         status: payload.status ?? "Pendiente",
