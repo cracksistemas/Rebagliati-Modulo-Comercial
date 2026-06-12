@@ -19,6 +19,7 @@ import {
   UsersRound
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { getCommercialState } from "@/lib/commercial/store";
 import { supabase } from "@/lib/supabase/client";
 
 type SessionHeaderProfile = {
@@ -29,17 +30,28 @@ type SessionHeaderProfile = {
 };
 
 const navItems = [
-  { href: "/dashboard", label: "Resumen mensual", icon: LayoutDashboard },
-  { href: "/sales/new", label: "Registrar venta", icon: CircleDollarSign },
-  { href: "/ranking", label: "Ranking de ejecutivos", icon: Trophy },
-  { href: "/teams", label: "Ventas por equipo", icon: UsersRound },
-  { href: "/executives", label: "Ejecutivos", icon: Flag },
-  { href: "/goals", label: "Metas", icon: Target },
-  { href: "/sales/validation", label: "Validacion de ventas", icon: ClipboardCheck },
-  { href: "/customer-map", label: "Mapa de Clientes", icon: BookOpenCheck },
-  { href: "/reports", label: "Reportes", icon: BarChart3 },
-  { href: "/settings", label: "Configuracion", icon: Settings }
+  { href: "/dashboard", label: "Resumen mensual", icon: LayoutDashboard, permission: "dashboard.resumen" },
+  { href: "/sales/new", label: "Registrar venta", icon: CircleDollarSign, permission: "sales.new" },
+  { href: "/ranking", label: "Ranking de ejecutivos", icon: Trophy, permission: "ranking.executives" },
+  { href: "/teams", label: "Ventas por equipo", icon: UsersRound, permission: "teams.view" },
+  { href: "/executives", label: "Ejecutivos", icon: Flag, permission: "executives.manage" },
+  { href: "/goals", label: "Metas", icon: Target, permission: "goals.manage" },
+  { href: "/sales/validation", label: "Validacion de ventas", icon: ClipboardCheck, permission: "sales.validation" },
+  { href: "/customer-map", label: "Mapa de Clientes", icon: BookOpenCheck, permission: "customer-map.view" },
+  { href: "/reports", label: "Reportes", icon: BarChart3, permission: "reports.export" },
+  { href: "/settings", label: "Configuracion", icon: Settings, permission: "settings.users" }
 ];
+
+function normalizeRoleLabel(role = "") {
+  const normalized = role.toLowerCase();
+  if (normalized.includes("admin_sistema") || normalized.includes("super")) return "Superadministrador";
+  if (normalized.includes("gerencia")) return "Gerencia";
+  if (normalized.includes("jefe")) return "Jefe de ventas";
+  if (normalized.includes("lider")) return "Lider de ventas";
+  if (normalized.includes("marketing") || normalized.includes("soporte")) return "Marketing";
+  if (normalized.includes("lectura")) return "Solo lectura";
+  return "Ejecutivo";
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -74,6 +86,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const visibleNavItems = useMemo(() => {
+    const state = getCommercialState();
+    const roleLabel = normalizeRoleLabel(profile?.role ?? "");
+    const roleConfig = state.rolePermissions.find((item) => item.role === roleLabel);
+    if (roleConfig) {
+      return navItems.filter((item) => roleConfig.permissions.includes(item.permission));
+    }
+
     const role = profile?.role.toLowerCase() ?? "";
     if (role.includes("ejecutivo") && !role.includes("lider")) {
       return navItems.filter((item) =>
@@ -113,10 +132,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <Link className="primary-button" href="/sales/new">
-          <Plus size={18} />
-          <span className="nav-label">Registrar venta</span>
-        </Link>
+        {visibleNavItems.some((item) => item.href === "/sales/new") ? (
+          <Link className="primary-button" href="/sales/new">
+            <Plus size={18} />
+            <span className="nav-label">Registrar venta</span>
+          </Link>
+        ) : null}
 
         <div className="sidebar-section">Dashboard</div>
         <nav className="nav">

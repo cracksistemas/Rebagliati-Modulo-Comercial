@@ -98,6 +98,9 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
     teams,
     sales,
     users: asArray(source.users, seedState.users),
+    programs: asArray(source.programs, seedState.programs),
+    discounts: asArray(source.discounts, seedState.discounts),
+    rolePermissions: asArray(source.rolePermissions, seedState.rolePermissions),
     audit: asArray(source.audit, seedState.audit),
     clientProfiles: asArray(source.clientProfiles, seedState.clientProfiles)
   };

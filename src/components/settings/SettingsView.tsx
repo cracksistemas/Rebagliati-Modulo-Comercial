@@ -3,8 +3,8 @@
 import { Camera, Lock, ShieldCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
-import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
-import type { Executive, UserProfile } from "@/lib/commercial/types";
+import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
+import type { AuthorizedDiscount, Executive, ModulePermission, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
 
 const roles = [
   "Superadministrador",
@@ -14,6 +14,21 @@ const roles = [
   "Ejecutivo",
   "Marketing",
   "Solo lectura"
+];
+
+const permissionCatalog: ModulePermission[] = [
+  { id: "dashboard.resumen", module: "Dashboard", submodule: "Resumen mensual" },
+  { id: "sales.new", module: "Ventas", submodule: "Registrar venta" },
+  { id: "sales.validation", module: "Ventas", submodule: "Validacion de ventas" },
+  { id: "ranking.executives", module: "Ranking", submodule: "Ranking de ejecutivos" },
+  { id: "teams.view", module: "Equipos", submodule: "Ventas por equipo" },
+  { id: "executives.manage", module: "Ejecutivos", submodule: "Directorio comercial" },
+  { id: "goals.manage", module: "Metas", submodule: "Metas mensuales" },
+  { id: "customer-map.view", module: "Mapa de Clientes", submodule: "Perfiles y argumentos" },
+  { id: "reports.export", module: "Reportes", submodule: "Exportables" },
+  { id: "settings.users", module: "Configuracion", submodule: "Usuarios" },
+  { id: "settings.roles", module: "Configuracion", submodule: "Roles y permisos" },
+  { id: "settings.discounts", module: "Configuracion", submodule: "Descuentos autorizados" }
 ];
 
 type EditableUser = UserProfile & {
@@ -30,6 +45,11 @@ type AvatarCropDraft = {
 
 function isExecutiveRole(role: string) {
   return role.toLowerCase().includes("ejecutivo") || role.toLowerCase().includes("lider");
+}
+
+function canManageCommercialRules(role: string) {
+  const normalized = role.toLowerCase();
+  return normalized.includes("super") || normalized.includes("admin") || normalized.includes("jefe") || normalized.includes("gerencia") || normalized.includes("encargado");
 }
 
 function dedupeUsersByEmail(users: UserProfile[]) {
@@ -68,6 +88,8 @@ export function SettingsView() {
   const [avatarCrop, setAvatarCrop] = useState<AvatarCropDraft | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [discountDraft, setDiscountDraft] = useState<AuthorizedDiscount>({ id: "", label: "", amount: 0, active: true });
+  const [selectedRole, setSelectedRole] = useState("Ejecutivo");
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   useEffect(() => {
@@ -99,6 +121,8 @@ export function SettingsView() {
       ),
     [query, state.users]
   );
+  const currentAdminRole = dedupeUsersByEmail(state.users).find((user) => user.email === "admin@test.com")?.role ?? "Superadministrador";
+  const canEditRules = canManageCommercialRules(currentAdminRole);
 
   function openEditor(user?: UserProfile) {
     setErrorMessage("");
@@ -255,6 +279,67 @@ export function SettingsView() {
     }
   }
 
+  function saveDiscount() {
+    if (!canEditRules || !discountDraft.label.trim()) return;
+    const discount: AuthorizedDiscount = {
+      ...discountDraft,
+      id: discountDraft.id || `discount-${crypto.randomUUID()}`,
+      amount: Number(discountDraft.amount),
+      active: discountDraft.active
+    };
+    const exists = state.discounts.some((item) => item.id === discount.id);
+    const next = {
+      ...state,
+      discounts: exists ? state.discounts.map((item) => (item.id === discount.id ? discount : item)) : [discount, ...state.discounts],
+      audit: [
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toLocaleString("es-PE"),
+          actor: "Administrador Comercial",
+          action: exists ? "Edito descuento autorizado" : "Creo descuento autorizado",
+          module: "Configuracion",
+          target: discount.label,
+          result: "Exitoso" as const,
+          criticality: "Alta" as const
+        },
+        ...state.audit
+      ]
+    };
+    setState(next);
+    setCommercialState(next);
+    setDiscountDraft({ id: "", label: "", amount: 0, active: true });
+  }
+
+  function toggleRolePermission(role: string, permissionId: string) {
+    if (!canEditRules) return;
+    const current = state.rolePermissions.find((item) => item.role === role) ?? { role, permissions: [] };
+    const hasPermission = current.permissions.includes(permissionId);
+    const nextRole: RolePermissionConfig = {
+      role,
+      permissions: hasPermission ? current.permissions.filter((item) => item !== permissionId) : [...current.permissions, permissionId]
+    };
+    const exists = state.rolePermissions.some((item) => item.role === role);
+    const next = {
+      ...state,
+      rolePermissions: exists ? state.rolePermissions.map((item) => (item.role === role ? nextRole : item)) : [...state.rolePermissions, nextRole],
+      audit: [
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toLocaleString("es-PE"),
+          actor: "Administrador Comercial",
+          action: hasPermission ? "Retiro permiso de rol" : "Agrego permiso de rol",
+          module: "Configuracion",
+          target: `${role} - ${permissionId}`,
+          result: "Exitoso" as const,
+          criticality: "Alta" as const
+        },
+        ...state.audit
+      ]
+    };
+    setState(next);
+    setCommercialState(next);
+  }
+
   return (
     <div className="grid">
       <section className="grid grid-4">
@@ -325,6 +410,65 @@ export function SettingsView() {
                   <strong>{event.action}</strong>
                   <p className="muted">{event.actor} · {event.module} · {event.createdAt}</p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-2">
+        <div className="card">
+          <p className="eyebrow">Permisos editables</p>
+          <h2>Modulos y submodulos por rol</h2>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>Rol a configurar</label>
+            <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)}>
+              {roles.map((role) => <option key={role}>{role}</option>)}
+            </select>
+          </div>
+          <div className="grid" style={{ marginTop: 12 }}>
+            {permissionCatalog.map((permission) => {
+              const roleConfig = state.rolePermissions.find((item) => item.role === selectedRole);
+              const checked = roleConfig?.permissions.includes(permission.id) ?? false;
+              return (
+                <label key={permission.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #E5E5EA", padding: "10px 0" }}>
+                  <span>
+                    <strong>{permission.module}</strong>
+                    <p className="muted">{permission.submodule}</p>
+                  </span>
+                  <input type="checkbox" checked={checked} disabled={!canEditRules} onChange={() => toggleRolePermission(selectedRole, permission.id)} />
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="card">
+          <p className="eyebrow">Descuentos</p>
+          <h2>Descuentos autorizados</h2>
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <div className="field"><label>Etiqueta</label><input value={discountDraft.label} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, label: event.target.value })} placeholder="Ej. S/ 200 campana" /></div>
+            <div className="field"><label>Monto</label><input type="number" value={discountDraft.amount} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, amount: Number(event.target.value) })} /></div>
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={discountDraft.requiresApproval ?? false} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, requiresApproval: event.target.checked })} />
+              Requiere autorizacion
+            </label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={discountDraft.active} disabled={!canEditRules} onChange={(event) => setDiscountDraft({ ...discountDraft, active: event.target.checked })} />
+              Activo
+            </label>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <button className="primary-button" disabled={!canEditRules} onClick={saveDiscount}>Guardar descuento</button>
+          </div>
+          <div className="grid" style={{ marginTop: 14 }}>
+            {state.discounts.map((discount) => (
+              <div key={discount.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", borderBottom: "1px solid #E5E5EA", padding: "10px 0" }}>
+                <span>
+                  <strong>{discount.label}</strong>
+                  <p className="muted">{discount.requiresApproval ? "Especial con autorizacion" : money(discount.amount)} · {discount.active ? "Activo" : "Inactivo"}</p>
+                </span>
+                <button className="ghost-button" disabled={!canEditRules} onClick={() => setDiscountDraft(discount)}>Editar</button>
               </div>
             ))}
           </div>

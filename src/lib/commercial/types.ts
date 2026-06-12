@@ -56,6 +56,33 @@ export type UserProfile = {
   teamId?: string;
 };
 
+export type SalesProgram = {
+  id: string;
+  name: string;
+  productType: ProductType;
+  active: boolean;
+  createdAt: string;
+};
+
+export type AuthorizedDiscount = {
+  id: string;
+  label: string;
+  amount: number;
+  active: boolean;
+  requiresApproval?: boolean;
+};
+
+export type ModulePermission = {
+  id: string;
+  module: string;
+  submodule: string;
+};
+
+export type RolePermissionConfig = {
+  role: string;
+  permissions: string[];
+};
+
 export type AuditEvent = {
   id: string;
   createdAt: string;
@@ -97,6 +124,9 @@ export type CommercialState = {
   teams: Team[];
   sales: Sale[];
   users: UserProfile[];
+  programs: SalesProgram[];
+  discounts: AuthorizedDiscount[];
+  rolePermissions: RolePermissionConfig[];
   audit: AuditEvent[];
   clientProfiles: ClientProfile[];
 };
