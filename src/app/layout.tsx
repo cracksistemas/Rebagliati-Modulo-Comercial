@@ -1,0 +1,18 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { AppShell } from "@/components/layout/AppShell";
+
+export const metadata: Metadata = {
+  title: "Rebagliati Modulo Comercial",
+  description: "Ranking, control de ventas y mapa comercial interno"
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="es">
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
+}

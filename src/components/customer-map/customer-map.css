@@ -1,0 +1,413 @@
+.customer-map-page {
+  display: grid;
+  gap: 18px;
+}
+
+.customer-map-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.customer-map-hero h2 {
+  margin: 0;
+  font-size: 2.1rem;
+}
+
+.customer-map-hero p:not(.eyebrow) {
+  max-width: 720px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.customer-map-actions,
+.customer-view-toggle,
+.compare-selectors {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.customer-map-controls {
+  display: grid;
+  gap: 16px;
+}
+
+.customer-search {
+  position: relative;
+}
+
+.customer-search svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  color: var(--text-muted);
+  transform: translateY(-50%);
+}
+
+.customer-search .input {
+  padding-left: 42px;
+}
+
+.customer-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: rgba(142, 142, 147, 0.12);
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.customer-view-toggle button.is-active {
+  background: rgba(0, 167, 235, 0.14);
+  color: var(--reba-primary);
+}
+
+.customer-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.customer-filter-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.client-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.client-profile-card {
+  display: grid;
+  gap: 14px;
+}
+
+.client-card-head,
+.profile-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.client-card-head h3,
+.quick-guide h2 {
+  margin: 6px 0;
+}
+
+.client-card-head p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.client-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(0, 167, 235, 0.18), rgba(1, 1, 123, 0.12));
+  color: var(--reba-primary);
+  font-weight: 900;
+}
+
+.client-avatar.is-large {
+  width: 112px;
+  height: 112px;
+  border-radius: 36px;
+  font-size: 2rem;
+}
+
+.client-status {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(0, 167, 235, 0.1);
+  color: var(--reba-primary);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.info-block {
+  display: grid;
+  gap: 4px;
+}
+
+.info-block span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.info-block p {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.48;
+}
+
+.client-card-metrics,
+.pain-meta,
+.detail-metrics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.client-card-metrics span,
+.pain-meta span,
+.detail-metrics span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(245, 245, 247, 0.9);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.empathy-map {
+  display: grid;
+  gap: 18px;
+}
+
+.empathy-layout {
+  display: grid;
+  grid-template-areas:
+    ". top ."
+    "left center right"
+    ". bottom .";
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1fr) minmax(180px, 0.8fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.map-bubble,
+.map-center,
+.quick-sales-card,
+.pain-card,
+.empty-client-state {
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(245, 245, 247, 0.86);
+}
+
+.map-bubble {
+  display: grid;
+  gap: 8px;
+}
+
+.map-bubble span {
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.map-top {
+  grid-area: top;
+}
+
+.map-left {
+  grid-area: left;
+}
+
+.map-right {
+  grid-area: right;
+}
+
+.map-bottom {
+  grid-area: bottom;
+}
+
+.map-center {
+  grid-area: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  background: white;
+  box-shadow: var(--shadow-subtle);
+}
+
+.map-center span,
+.map-center small {
+  color: var(--text-muted);
+}
+
+.temperature-bar,
+.heat-row i {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.16);
+}
+
+.temperature-bar i,
+.heat-row i {
+  background: linear-gradient(90deg, var(--reba-accent), var(--reba-primary));
+}
+
+.temperature-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.pain-heat,
+.quick-guide,
+.quick-sales-card {
+  display: grid;
+  gap: 14px;
+}
+
+.heat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.heat-row i {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+
+.profile-detail-header {
+  align-items: center;
+  border-radius: 24px;
+  padding: 16px;
+  background: rgba(245, 245, 247, 0.86);
+}
+
+.profile-detail-header h2 {
+  margin: 6px 0;
+}
+
+.profile-detail-header p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.detail-metrics {
+  margin-left: auto;
+  max-width: 260px;
+}
+
+.detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.detail-tabs button {
+  border-radius: 999px;
+  padding: 8px 11px;
+  background: rgba(142, 142, 147, 0.12);
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.detail-tabs button.is-active {
+  background: rgba(0, 167, 235, 0.14);
+  color: var(--reba-primary);
+}
+
+.pain-card-grid,
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pain-card {
+  display: grid;
+  gap: 12px;
+}
+
+.pain-card h3 {
+  margin: 0;
+}
+
+.pain-card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.list-tab {
+  display: grid;
+  gap: 10px;
+}
+
+.list-tab span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(245, 245, 247, 0.86);
+}
+
+.empty-client-state {
+  display: grid;
+  place-items: center;
+  min-height: 210px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1120px) {
+  .client-card-grid,
+  .customer-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .empathy-layout {
+    grid-template-areas:
+      "center"
+      "top"
+      "left"
+      "right"
+      "bottom";
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .customer-map-hero,
+  .client-card-grid,
+  .customer-filter-grid,
+  .pain-card-grid,
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-map-hero {
+    display: grid;
+  }
+
+  .profile-detail-header {
+    display: grid;
+  }
+
+  .detail-metrics {
+    margin-left: 0;
+  }
+}

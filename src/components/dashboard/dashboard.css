@@ -1,0 +1,325 @@
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 18px;
+}
+
+.kpi-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  background: rgba(0, 167, 235, 0.1);
+  color: var(--reba-primary);
+}
+
+.kpi-card span {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.goal-card h2,
+.battle-card h2,
+.product-card h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.goal-ring {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 999px;
+  background: conic-gradient(var(--ring-color) var(--ring-value), rgba(142, 142, 147, 0.14) 0);
+}
+
+.goal-ring::before {
+  content: "";
+  position: absolute;
+}
+
+.goal-ring span {
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  font-weight: 850;
+}
+
+.ring-success,
+.bar-success {
+  --ring-color: var(--success);
+}
+
+.ring-accent,
+.bar-accent {
+  --ring-color: var(--reba-accent);
+}
+
+.ring-warning,
+.bar-warning {
+  --ring-color: var(--warning);
+}
+
+.ring-danger,
+.bar-danger {
+  --ring-color: var(--danger);
+}
+
+.goal-progress-bar,
+.team-bar,
+.product-bar {
+  overflow: hidden;
+  width: 100%;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.14);
+}
+
+.goal-progress-bar {
+  margin: 22px 0;
+}
+
+.goal-progress-bar span,
+.team-bar span,
+.product-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ring-color, var(--reba-accent));
+  transition: width 260ms ease;
+}
+
+.goal-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-metrics div {
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(245, 245, 247, 0.84);
+}
+
+.goal-metrics span,
+.team-card-mini p,
+.product-row span,
+.product-row p {
+  color: var(--text-muted);
+}
+
+.goal-metrics span,
+.goal-metrics strong {
+  display: block;
+}
+
+.battle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.empty-battle {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  margin-top: 20px;
+  border-radius: 24px;
+  background: rgba(245, 245, 247, 0.84);
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 800;
+}
+
+.battle-side {
+  display: flex;
+  min-height: 310px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(245, 245, 247, 0.9), rgba(255, 255, 255, 0.76));
+  text-align: center;
+}
+
+.battle-ring {
+  display: grid;
+  place-items: center;
+  width: 148px;
+  height: 148px;
+  border-radius: 999px;
+  background: conic-gradient(var(--reba-accent) var(--ring-value), rgba(1, 1, 123, 0.09) 0);
+}
+
+.battle-ring .avatar {
+  border: 8px solid var(--bg-card);
+}
+
+.battle-side strong {
+  margin-top: 16px;
+  color: var(--reba-primary);
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.battle-side h3 {
+  margin: 6px 0 0;
+  font-size: 1.2rem;
+}
+
+.battle-side p,
+.battle-side span {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.team-card-mini {
+  border: 1px solid rgba(229, 229, 234, 0.8);
+  border-radius: 20px;
+  padding: 18px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-subtle);
+}
+
+.team-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-card-top span {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--team-color);
+}
+
+.mini-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.mini-stats span,
+.mini-stats strong {
+  display: block;
+}
+
+.mini-stats span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.team-bar span {
+  background: var(--team-color);
+}
+
+.team-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.product-mix {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.product-row {
+  display: grid;
+  grid-template-columns: 160px minmax(120px, 1fr) 170px;
+  align-items: center;
+  gap: 14px;
+}
+
+.product-row strong,
+.product-row span {
+  display: block;
+}
+
+.product-row strong {
+  color: var(--reba-primary);
+}
+
+.dashboard-alert-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.dashboard-alert {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(245, 245, 247, 0.86);
+}
+
+.dashboard-alert svg {
+  color: var(--text-muted);
+}
+
+.dashboard-alert span {
+  color: var(--text-muted);
+  font-weight: 750;
+}
+
+.dashboard-alert strong {
+  color: var(--text-main);
+}
+
+.dashboard-alert-warning svg,
+.dashboard-alert-warning strong {
+  color: var(--warning);
+}
+
+.dashboard-alert-success svg,
+.dashboard-alert-success strong {
+  color: var(--success);
+}
+
+.dashboard-alert-accent svg,
+.dashboard-alert-accent strong {
+  color: var(--reba-accent);
+}
+
+.daily-trend-bars {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  height: 120px;
+  margin-top: 18px;
+  border-radius: 20px;
+  padding: 14px;
+  background: rgba(245, 245, 247, 0.86);
+}
+
+.daily-trend-bars span {
+  flex: 1;
+  min-width: 12px;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(180deg, var(--reba-accent), rgba(1, 1, 123, 0.72));
+}
+
+@media (max-width: 760px) {
+  .battle-grid,
+  .goal-metrics,
+  .product-row,
+  .dashboard-alert {
+    grid-template-columns: 1fr;
+  }
+}

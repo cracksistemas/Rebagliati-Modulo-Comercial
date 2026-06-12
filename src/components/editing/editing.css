@@ -1,0 +1,212 @@
+.action-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.icon-command {
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.editor-grid label,
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.photo-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 18px;
+  align-items: start;
+}
+
+.crop-stage {
+  display: grid;
+  place-items: center;
+  min-height: 430px;
+  border-radius: 24px;
+  background:
+    linear-gradient(45deg, rgba(142, 142, 147, 0.12) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(142, 142, 147, 0.12) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(142, 142, 147, 0.12) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(142, 142, 147, 0.12) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  overflow: hidden;
+}
+
+.crop-workspace {
+  position: relative;
+  width: var(--stage-size);
+  height: var(--stage-size);
+  overflow: hidden;
+  border-radius: 24px;
+  box-shadow: 0 18px 44px rgba(29, 29, 31, 0.16);
+  background: rgba(255, 255, 255, 0.8);
+  cursor: grab;
+  touch-action: none;
+}
+
+.crop-workspace:active {
+  cursor: grabbing;
+}
+
+.crop-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.crop-mask {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle calc(var(--crop-size) / 2) at center,
+    transparent 0,
+    transparent calc(var(--crop-size) / 2),
+    rgba(29, 29, 31, 0.48) calc(var(--crop-size) / 2 + 1px)
+  );
+  pointer-events: none;
+}
+
+.crop-guide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--crop-size);
+  height: var(--crop-size);
+  border: 3px solid white;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 167, 235, 0.7), 0 14px 34px rgba(29, 29, 31, 0.16);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crop-placeholder {
+  display: grid;
+  place-items: center;
+  width: 240px;
+  height: 240px;
+  border-radius: 999px;
+  background: rgba(0, 167, 235, 0.12);
+  color: var(--reba-primary);
+  text-align: center;
+  font-weight: 850;
+}
+
+.crop-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(245, 245, 247, 0.84);
+}
+
+.crop-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--reba-accent);
+}
+
+.crop-controls .muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.profile-photo-inline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 20px;
+  padding: 14px;
+  background: rgba(245, 245, 247, 0.84);
+}
+
+.upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: 999px;
+  background: rgba(0, 167, 235, 0.1);
+  color: var(--reba-primary);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.edit-command-card {
+  display: flex;
+  min-height: 116px;
+  align-items: center;
+  gap: 14px;
+  border-radius: 22px;
+  padding: 18px;
+  background: var(--bg-card);
+  border: 1px solid rgba(229, 229, 234, 0.78);
+  box-shadow: var(--shadow-subtle);
+}
+
+.edit-command-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  background: rgba(0, 167, 235, 0.1);
+  color: var(--reba-primary);
+}
+
+.edit-command-card strong,
+.edit-command-card span {
+  display: block;
+}
+
+.edit-command-card span {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 860px) {
+  .photo-editor,
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+}
