@@ -63,12 +63,12 @@ export function DashboardView() {
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/kommo/metrics/response-time", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((payload) => {
+    async function loadKommoMetric() {
+      try {
+        const response = await fetch(`/api/kommo/metrics/response-time?ts=${Date.now()}`, { cache: "no-store" });
+        const payload = await response.json();
         if (mounted && payload?.data) setKommoMetric(payload.data);
-      })
-      .catch(() => {
+      } catch {
         if (mounted) {
           setKommoMetric({
             connected: false,
@@ -78,9 +78,13 @@ export function DashboardView() {
             samples: 0
           });
         }
-      });
+      }
+    }
+    loadKommoMetric();
+    const interval = window.setInterval(loadKommoMetric, 5 * 60 * 1000);
     return () => {
       mounted = false;
+      window.clearInterval(interval);
     };
   }, [state.avgResponseTime]);
 

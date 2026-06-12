@@ -52,8 +52,11 @@ textarea {
 }
 
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width, 280px);
   height: 100vh;
   padding: 18px 12px;
   background: rgba(255, 255, 255, 0.78);
@@ -62,6 +65,24 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 167, 235, 0.28) transparent;
+  z-index: 30;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 7px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 167, 235, 0.24);
+  border-radius: 999px;
 }
 
 .brand {

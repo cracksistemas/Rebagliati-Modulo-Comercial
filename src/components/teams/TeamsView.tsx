@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, Users } from "lucide-react";
+import { ClipboardList, PieChart, Trophy, Pencil, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, upsertTeam } from "@/lib/commercial/store";
@@ -17,12 +17,36 @@ const emptyTeam: Team = {
 export function TeamsView() {
   const [state, setState] = useState(getCommercialState);
   const [editing, setEditing] = useState<Team | null>(null);
+  const [detail, setDetail] = useState<{ team: Team; view: "members" | "sales" | "ranking" | "mix" } | null>(null);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   const total = useMemo(() => state.executives.reduce((sum, item) => sum + item.currentSales, 0), [state.executives]);
 
   function openEditor(team?: Team) {
     setEditing(team ?? { ...emptyTeam, id: crypto.randomUUID() });
+  }
+
+  function teamMembers(team: Team) {
+    return state.executives.filter((item) => item.teamId === team.id && item.status === "Activo");
+  }
+
+  function teamSales(team: Team) {
+    return state.sales.filter((sale) => sale.teamId === team.id);
+  }
+
+  function teamMix(team: Team) {
+    const sales = teamSales(team);
+    const totalAmount = sales.reduce((sum, sale) => sum + sale.netAmount, 0);
+    return ["Curso", "Curso Modular", "Diplomado"].map((type) => {
+      const items = sales.filter((sale) => sale.productType === type);
+      const amount = items.reduce((sum, sale) => sum + sale.netAmount, 0);
+      return {
+        type,
+        quantity: items.reduce((sum, sale) => sum + sale.quantity, 0),
+        amount,
+        percent: totalAmount ? (amount / totalAmount) * 100 : 0
+      };
+    });
   }
 
   return (
@@ -39,7 +63,7 @@ export function TeamsView() {
 
       <section className="grid grid-3">
         {state.teams.map((team) => {
-          const members = state.executives.filter((item) => item.teamId === team.id && item.status === "Activo");
+          const members = teamMembers(team);
           const amount = members.reduce((sum, item) => sum + item.currentSales, 0);
           const leader = state.executives.find((item) => item.id === team.leaderId);
           return (
@@ -58,7 +82,10 @@ export function TeamsView() {
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span>Aporte total</span><strong>{total ? ((amount / total) * 100).toFixed(1) : "0"}%</strong></div>
                 <div className="progress"><span style={{ width: `${Math.min((amount / team.goalAmount) * 100, 100)}%`, background: team.color }} /></div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {["Ver integrantes", "Ver ventas", "Ranking interno", "Mix productos"].map((action) => <span className="badge" key={action}>{action}</span>)}
+                  <button className="ghost-button" onClick={() => setDetail({ team, view: "members" })}><Users size={15} /> Ver integrantes</button>
+                  <button className="ghost-button" onClick={() => setDetail({ team, view: "sales" })}><ClipboardList size={15} /> Ver ventas</button>
+                  <button className="ghost-button" onClick={() => setDetail({ team, view: "ranking" })}><Trophy size={15} /> Ranking interno</button>
+                  <button className="ghost-button" onClick={() => setDetail({ team, view: "mix" })}><PieChart size={15} /> Mix productos</button>
                 </div>
               </div>
             </article>
@@ -119,6 +146,92 @@ export function TeamsView() {
               <button className="ghost-button" onClick={() => setEditing(null)}>Cancelar</button>
               <button className="primary-button" onClick={() => { upsertTeam(editing); setEditing(null); }}>Guardar equipo</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {detail && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div>
+                <p className="eyebrow">Ventas por equipo</p>
+                <h2>{detail.team.name}</h2>
+              </div>
+              <button className="ghost-button" onClick={() => setDetail(null)}>Cerrar</button>
+            </div>
+
+            {detail.view === "members" ? (
+              <section className="grid" style={{ marginTop: 16 }}>
+                <h3>Integrantes</h3>
+                {teamMembers(detail.team).map((member) => (
+                  <div className="card" style={{ boxShadow: "none", display: "flex", alignItems: "center", gap: 12 }} key={member.id}>
+                    {member.photoUrl ? <img className="avatar" src={member.photoUrl} alt={member.fullName} /> : <span className="avatar">{member.fullName.slice(0, 2).toUpperCase()}</span>}
+                    <div style={{ flex: 1 }}>
+                      <strong>{member.fullName}</strong>
+                      <p className="muted">{member.code} - {member.shift} - {member.status}</p>
+                    </div>
+                    <span className="badge">{money(member.currentSales)}</span>
+                    <span className="badge">{member.points} pts</span>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
+            {detail.view === "sales" ? (
+              <section style={{ marginTop: 16 }}>
+                <h3>Ventas registradas</h3>
+                <table className="table">
+                  <thead><tr><th>Fecha</th><th>Ejecutivo</th><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Neto</th><th>Estado</th></tr></thead>
+                  <tbody>
+                    {teamSales(detail.team).map((sale) => (
+                      <tr key={sale.id}>
+                        <td>{sale.saleDate}</td>
+                        <td>{state.executives.find((item) => item.id === sale.executiveId)?.fullName ?? "Sin ejecutivo"}</td>
+                        <td>{sale.productName}</td>
+                        <td>{sale.productType}</td>
+                        <td>{sale.quantity}</td>
+                        <td>{money(sale.netAmount)}</td>
+                        <td><span className="badge">{sale.validationStatus}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!teamSales(detail.team).length ? <p className="muted">Este equipo aun no tiene ventas registradas.</p> : null}
+              </section>
+            ) : null}
+
+            {detail.view === "ranking" ? (
+              <section className="grid" style={{ marginTop: 16 }}>
+                <h3>Ranking interno</h3>
+                {[...teamMembers(detail.team)].sort((a, b) => b.points - a.points || b.currentSales - a.currentSales).map((member, index) => (
+                  <div className="card" style={{ boxShadow: "none", display: "flex", alignItems: "center", gap: 12 }} key={member.id}>
+                    <strong style={{ width: 36 }}>#{index + 1}</strong>
+                    {member.photoUrl ? <img className="avatar" src={member.photoUrl} alt={member.fullName} /> : <span className="avatar">{member.fullName.slice(0, 2).toUpperCase()}</span>}
+                    <div style={{ flex: 1 }}>
+                      <strong>{member.fullName}</strong>
+                      <p className="muted">{money(member.currentSales)} acumulado</p>
+                    </div>
+                    <span className="badge">{member.points} pts</span>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
+            {detail.view === "mix" ? (
+              <section className="grid" style={{ marginTop: 16 }}>
+                <h3>Mix de productos</h3>
+                {teamMix(detail.team).map((item) => (
+                  <div key={item.type}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                      <strong>{item.type}</strong>
+                      <span>{item.quantity} ventas - {money(item.amount)} - {item.percent.toFixed(1)}%</span>
+                    </div>
+                    <div className="progress" style={{ marginTop: 8 }}><span style={{ width: `${Math.min(item.percent, 100)}%`, background: detail.team.color }} /></div>
+                  </div>
+                ))}
+              </section>
+            ) : null}
           </div>
         </div>
       )}
