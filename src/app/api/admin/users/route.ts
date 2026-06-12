@@ -35,6 +35,20 @@ function isExecutiveRole(role = "") {
   return role.toLowerCase().includes("ejecutivo") || role.toLowerCase().includes("lider");
 }
 
+function normalizeProfileRole(role = "Ejecutivo") {
+  const normalized = role.toLowerCase().trim().replace(/\s+/g, " ");
+  if (normalized === "admin_sistema" || normalized.includes("super") || normalized === "administrador" || normalized.includes("administrador del sistema")) {
+    return "admin_sistema";
+  }
+  if (normalized === "gerencia" || normalized.includes("gerencia")) return "gerencia";
+  if (normalized === "jefe_ventas" || normalized.includes("jefe")) return "jefe_ventas";
+  if (normalized === "lider_ventas" || normalized.includes("lider") || normalized.includes("líder")) return "lider_ventas";
+  if (normalized === "marketing_soporte" || normalized.includes("marketing") || normalized.includes("soporte") || normalized.includes("solo lectura")) {
+    return "marketing_soporte";
+  }
+  return "ejecutivo";
+}
+
 function isUuid(value?: string) {
   return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));
 }
@@ -135,6 +149,7 @@ export async function POST(request: NextRequest) {
     const shouldCreate = !isUuid(payload.id);
     const password = payload.password?.trim();
     const email = payload.email.trim();
+    const roleCode = normalizeProfileRole(payload.role);
 
     stage = "buscar usuario existente por correo";
     const existingAuthUser = shouldCreate ? await findAuthUserByEmail(admin, email) : null;
@@ -153,7 +168,7 @@ export async function POST(request: NextRequest) {
         password: password || undefined,
         user_metadata: {
           full_name: payload.fullName.trim(),
-          role: payload.role,
+          role: roleCode,
           area: payload.area ?? "Ventas"
         }
       });
@@ -166,7 +181,7 @@ export async function POST(request: NextRequest) {
         email_confirm: true,
         user_metadata: {
           full_name: payload.fullName.trim(),
-          role: payload.role,
+          role: roleCode,
           area: payload.area ?? "Ventas"
         }
       });
@@ -182,7 +197,7 @@ export async function POST(request: NextRequest) {
             password: password || undefined,
             user_metadata: {
               full_name: payload.fullName.trim(),
-              role: payload.role,
+              role: roleCode,
               area: payload.area ?? "Ventas"
             }
           });
@@ -200,7 +215,7 @@ export async function POST(request: NextRequest) {
         password: password || undefined,
         user_metadata: {
           full_name: payload.fullName.trim(),
-          role: payload.role,
+          role: roleCode,
           area: payload.area ?? "Ventas"
         }
       });
@@ -217,7 +232,7 @@ export async function POST(request: NextRequest) {
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,
       full_name: payload.fullName.trim(),
-      role: payload.role,
+      role: roleCode,
       avatar_url: avatarUrl,
       active: normalizeStatus(payload.status),
       created_at: new Date().toISOString()
@@ -273,7 +288,8 @@ export async function POST(request: NextRequest) {
       user_id: guard.userId,
       new_data: {
         email,
-        role: payload.role,
+        role: roleCode,
+        role_label: payload.role,
         executive_id: executiveId
       }
     });
