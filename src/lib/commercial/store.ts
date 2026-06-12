@@ -11,15 +11,109 @@ function canUseStorage() {
   return typeof window !== "undefined";
 }
 
+function asNumber(value: unknown, fallback = 0) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function asString(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function asArray<T>(value: unknown, fallback: T[]) {
+  return Array.isArray(value) ? (value as T[]) : fallback;
+}
+
+function normalizeState(value: Partial<CommercialState> | null | undefined): CommercialState {
+  const source = value ?? {};
+  const teams = asArray<Team>(source.teams, seedState.teams).map((team, index) => {
+    const seedTeam = seedState.teams[index] ?? seedState.teams[0];
+    return {
+      id: asString(team.id, seedTeam.id),
+      name: asString(team.name, seedTeam.name),
+      color: asString(team.color, seedTeam.color),
+      leaderId: asString(team.leaderId, seedTeam.leaderId ?? undefined),
+      goalAmount: asNumber(team.goalAmount, seedTeam.goalAmount),
+      active: typeof team.active === "boolean" ? team.active : seedTeam.active
+    };
+  });
+
+  const executives: Executive[] = asArray<Executive>(source.executives, seedState.executives).map((executive, index) => {
+    const seedExecutive = seedState.executives[index] ?? seedState.executives[0];
+    const shift: Executive["shift"] =
+      executive.shift === "Tarde" || executive.shift === "Noche" ? executive.shift : "Manana";
+    const status: Executive["status"] =
+      executive.status === "Inactivo" || executive.status === "Baja" ? executive.status : "Activo";
+    return {
+      id: asString(executive.id, seedExecutive.id),
+      fullName: asString(executive.fullName, seedExecutive.fullName),
+      code: asString(executive.code, seedExecutive.code),
+      teamId: asString(executive.teamId, seedExecutive.teamId),
+      shift,
+      status,
+      photoUrl: typeof executive.photoUrl === "string" ? executive.photoUrl : undefined,
+      goalAmount: asNumber(executive.goalAmount, seedExecutive.goalAmount),
+      currentSales: asNumber(executive.currentSales, seedExecutive.currentSales),
+      points: asNumber(executive.points, seedExecutive.points),
+      previousRank: asNumber(executive.previousRank, seedExecutive.previousRank)
+    };
+  });
+
+  const sales: Sale[] = asArray<Sale>(source.sales, seedState.sales).map((sale, index) => {
+    const seedSale = seedState.sales[index] ?? seedState.sales[0];
+    const productType: Sale["productType"] =
+      sale.productType === "Curso Modular" || sale.productType === "Diplomado" ? sale.productType : "Curso";
+    const validationStatus: Sale["validationStatus"] =
+      sale.validationStatus === "registrada" ||
+      sale.validationStatus === "validada" ||
+      sale.validationStatus === "observada" ||
+      sale.validationStatus === "anulada"
+        ? sale.validationStatus
+        : "pendiente_validacion";
+    return {
+      id: asString(sale.id, seedSale.id),
+      saleDate: asString(sale.saleDate, seedSale.saleDate),
+      executiveId: asString(sale.executiveId, seedSale.executiveId),
+      teamId: asString(sale.teamId, seedSale.teamId),
+      productType,
+      productName: asString(sale.productName, seedSale.productName),
+      quantity: asNumber(sale.quantity, seedSale.quantity),
+      grossAmount: asNumber(sale.grossAmount, seedSale.grossAmount),
+      discountAmount: asNumber(sale.discountAmount, seedSale.discountAmount),
+      netAmount: asNumber(sale.netAmount, seedSale.netAmount),
+      leadSource: asString(sale.leadSource, seedSale.leadSource),
+      paymentMethod: asString(sale.paymentMethod, seedSale.paymentMethod),
+      validationStatus,
+      notes: typeof sale.notes === "string" ? sale.notes : undefined
+    };
+  });
+
+  return {
+    ...seedState,
+    ...source,
+    month: asString(source.month, seedState.month),
+    companyGoal: asNumber(source.companyGoal, seedState.companyGoal),
+    avgResponseTime: asString(source.avgResponseTime, seedState.avgResponseTime),
+    executives,
+    teams,
+    sales,
+    users: asArray(source.users, seedState.users),
+    audit: asArray(source.audit, seedState.audit),
+    clientProfiles: asArray(source.clientProfiles, seedState.clientProfiles)
+  };
+}
+
 export function getCommercialState(): CommercialState {
   if (!canUseStorage()) return seedState;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seedState));
-    return seedState;
-  }
   try {
-    return { ...seedState, ...JSON.parse(raw) };
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seedState));
+      return seedState;
+    }
+    const normalized = normalizeState(JSON.parse(raw));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
   } catch {
     return seedState;
   }
@@ -34,8 +128,12 @@ export function setCommercialState(next: CommercialState) {
       photoUrl: item.photoUrl?.startsWith("blob:") ? undefined : item.photoUrl
     }))
   };
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(compact));
-  broadcastCommercialDataChange();
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeState(compact)));
+    broadcastCommercialDataChange();
+  } catch {
+    broadcastCommercialDataChange();
+  }
 }
 
 export function upsertExecutive(executive: Executive) {

@@ -7,7 +7,7 @@ import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import type { CommercialState, Executive } from "@/lib/commercial/types";
 
 function initials(name: string) {
-  return name
+  return (name || "NA")
     .split(" ")
     .slice(0, 2)
     .map((part) => part[0])
@@ -30,7 +30,7 @@ function BattleCard({ leaders, total }: { leaders: Executive[]; total: number })
     <section className="card">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         {[first, second].map((item, index) => {
-          const pct = index === 0 ? firstPercent : secondPercent;
+              const pct = Number.isFinite(index === 0 ? firstPercent : secondPercent) ? (index === 0 ? firstPercent : secondPercent) : 0;
           return (
             <div key={item.id} style={{ flex: 1, textAlign: "center" }}>
               {item.photoUrl ? <img className="avatar" src={item.photoUrl} alt={item.fullName} style={{ width: 92, height: 92, margin: "0 auto 12px" }} /> : <div className="avatar" style={{ width: 92, height: 92, margin: "0 auto 12px" }}>{initials(item.fullName)}</div>}
@@ -92,7 +92,7 @@ export function DashboardView() {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <strong>{item.points} pts</strong>
-                    <div className="muted">{((item.currentSales / totalExecutives) * 100).toFixed(1)}%</div>
+                    <div className="muted">{totalExecutives ? ((item.currentSales / totalExecutives) * 100).toFixed(1) : "0.0"}%</div>
                   </div>
                   <span className="badge" style={{ color: movement >= 0 ? "#34C759" : "#FF3B30" }}>
                     {movement >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
@@ -119,7 +119,7 @@ export function DashboardView() {
                     <strong>{team.name}</strong>
                     <span>{money(amount)}</span>
                   </div>
-                  <div className="progress" style={{ marginTop: 8 }}><span style={{ width: `${Math.min((amount / team.goalAmount) * 100, 100)}%`, background: team.color }} /></div>
+                  <div className="progress" style={{ marginTop: 8 }}><span style={{ width: `${team.goalAmount ? Math.min((amount / team.goalAmount) * 100, 100) : 0}%`, background: team.color }} /></div>
                 </div>
               );
             })}
