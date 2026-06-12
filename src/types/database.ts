@@ -15,6 +15,17 @@ export interface Database {
         Insert: Partial<Database["public"]["Tables"]["profiles"]["Row"]> & { id: string; full_name: string; role: string };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
       };
+      role_greetings: {
+        Row: {
+          id: string;
+          role: string;
+          message: string;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["role_greetings"]["Row"]> & { role: string; message: string };
+        Update: Partial<Database["public"]["Tables"]["role_greetings"]["Row"]>;
+      };
       sales: {
         Row: {
           id: string;

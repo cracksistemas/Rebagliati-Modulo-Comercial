@@ -10,9 +10,12 @@ Configura estas variables en Project Settings > Environment Variables:
 NEXT_PUBLIC_SUPABASE_URL=https://ombsfjcrzxtctpgmsnvd.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_erz6jERFBG_3GkebejSg8g_Jfe4zbZn
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=server-only-service-role-key
 ```
 
-No configures `service_role` en el frontend.
+`SUPABASE_SERVICE_ROLE_KEY` es solo para rutas API server-side en Vercel. No debe usarse con prefijo `NEXT_PUBLIC` ni dentro del frontend.
+
+La creacion de usuarios desde Configuracion usa `/api/admin/users`; esta ruta crea el acceso Auth, guarda `profiles`, y si el rol es `Ejecutivo` o `Lider de ventas`, tambien crea/vincula el registro en `executives` y `team_members`.
 
 ### Kommo en Vercel
 

@@ -50,6 +50,10 @@ export type UserProfile = {
   status: "Activo" | "Inactivo" | "Pendiente" | "Bloqueado" | "Archivado";
   lastAccess: string;
   createdAt: string;
+  avatarUrl?: string;
+  code?: string;
+  shift?: "Manana" | "Tarde" | "Noche";
+  teamId?: string;
 };
 
 export type AuditEvent = {

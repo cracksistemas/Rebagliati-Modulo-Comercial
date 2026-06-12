@@ -22,6 +22,41 @@ function isAssetPath(pathname: string) {
   );
 }
 
+function isBlockedByRole(pathname: string, role = "") {
+  const normalized = role.toLowerCase();
+
+  if (pathname.startsWith("/api/admin")) {
+    return !(
+      normalized.includes("superadministrador") ||
+      normalized.includes("administrador") ||
+      normalized.includes("admin_sistema") ||
+      normalized.includes("gerencia") ||
+      normalized.includes("jefe")
+    );
+  }
+
+  if (normalized.includes("ejecutivo") && !normalized.includes("lider")) {
+    return (
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/executives") ||
+      pathname.startsWith("/goals") ||
+      pathname.startsWith("/sales/validation")
+    );
+  }
+
+  if (normalized.includes("marketing") || normalized.includes("solo lectura") || normalized.includes("marketing_soporte")) {
+    return (
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/executives") ||
+      pathname.startsWith("/goals") ||
+      pathname.startsWith("/sales/new") ||
+      pathname.startsWith("/sales/validation")
+    );
+  }
+
+  return false;
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -67,6 +102,16 @@ export async function middleware(request: NextRequest) {
     dashboardUrl.pathname = "/dashboard";
     dashboardUrl.search = "";
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (isBlockedByRole(pathname, String(profile?.role ?? ""))) {
+      const dashboardUrl = request.nextUrl.clone();
+      dashboardUrl.pathname = "/dashboard";
+      dashboardUrl.search = "";
+      return NextResponse.redirect(dashboardUrl);
+    }
   }
 
   return response;

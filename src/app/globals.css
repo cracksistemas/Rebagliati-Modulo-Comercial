@@ -75,12 +75,19 @@ textarea {
   width: 46px;
   height: 46px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #ffffff, #dff5ff);
+  background: linear-gradient(135deg, #ffffff, #eaf8ff);
   display: grid;
   place-items: center;
   color: var(--reba-primary);
   font-weight: 900;
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.brand-mark img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
 }
 
 .brand-text,

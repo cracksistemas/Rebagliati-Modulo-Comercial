@@ -1,10 +1,10 @@
 "use client";
 
-import { Lock, ShieldCheck, UserPlus } from "lucide-react";
+import { Camera, Lock, ShieldCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
-import type { UserProfile } from "@/lib/commercial/types";
+import type { Executive, UserProfile } from "@/lib/commercial/types";
 
 const roles = [
   "Superadministrador",
@@ -16,10 +16,38 @@ const roles = [
   "Solo lectura"
 ];
 
+type EditableUser = UserProfile & {
+  password?: string;
+  avatarDataUrl?: string;
+};
+
+function isExecutiveRole(role: string) {
+  return role.toLowerCase().includes("ejecutivo") || role.toLowerCase().includes("lider");
+}
+
+function blankUser(): EditableUser {
+  return {
+    id: `draft-${Date.now()}`,
+    fullName: "",
+    email: "",
+    role: "Ejecutivo",
+    area: "Ventas",
+    status: "Pendiente",
+    lastAccess: "Sin acceso",
+    createdAt: new Date().toISOString().slice(0, 10),
+    code: "",
+    shift: "Manana",
+    teamId: "",
+    password: ""
+  };
+}
+
 export function SettingsView() {
   const [state, setState] = useState(getCommercialState);
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<UserProfile | null>(null);
+  const [editing, setEditing] = useState<EditableUser | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [saving, setSaving] = useState(false);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   const users = useMemo(
@@ -27,11 +55,51 @@ export function SettingsView() {
     [query, state.users]
   );
 
-  function saveUser(user: UserProfile) {
+  function openEditor(user?: UserProfile) {
+    setErrorMessage("");
+    setEditing(user ? { ...user, password: "" } : blankUser());
+  }
+
+  function readAvatar(file?: File) {
+    if (!file || !editing) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const avatarDataUrl = String(reader.result);
+      setEditing({ ...editing, avatarDataUrl, avatarUrl: avatarDataUrl });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function applyUserLocally(user: UserProfile, executiveId?: string | null) {
     const exists = state.users.some((item) => item.id === user.id);
+    const executives = [...state.executives];
+
+    if (isExecutiveRole(user.role)) {
+      const existingExecutiveIndex = executives.findIndex((item) => item.id === executiveId || item.id === user.id || item.code === user.code);
+      const executive: Executive = {
+        id: executiveId ?? user.id,
+        fullName: user.fullName,
+        code: user.code || `E-${user.id.slice(0, 4).toUpperCase()}`,
+        teamId: user.teamId,
+        shift: user.shift ?? "Manana",
+        status: user.status === "Activo" || user.status === "Pendiente" ? "Activo" : "Inactivo",
+        photoUrl: user.avatarUrl,
+        goalAmount: 0,
+        currentSales: 0,
+        points: 0,
+        previousRank: 99
+      };
+      if (existingExecutiveIndex >= 0) {
+        executives[existingExecutiveIndex] = { ...executives[existingExecutiveIndex], ...executive };
+      } else {
+        executives.unshift(executive);
+      }
+    }
+
     const next = {
       ...state,
       users: exists ? state.users.map((item) => (item.id === user.id ? user : item)) : [user, ...state.users],
+      executives,
       audit: [
         {
           id: crypto.randomUUID(),
@@ -48,7 +116,46 @@ export function SettingsView() {
     };
     setState(next);
     setCommercialState(next);
-    setEditing(null);
+  }
+
+  async function saveUser(user: EditableUser) {
+    setSaving(true);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user)
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "No se pudo crear el usuario.");
+      }
+
+      const saved = payload.data;
+      const nextUser: UserProfile = {
+        id: saved.id,
+        fullName: saved.fullName,
+        email: saved.email,
+        role: saved.role,
+        area: saved.area,
+        status: saved.status,
+        lastAccess: user.lastAccess,
+        createdAt: user.createdAt,
+        avatarUrl: saved.avatarUrl ?? user.avatarUrl,
+        code: user.code,
+        shift: user.shift,
+        teamId: user.teamId
+      };
+      applyUserLocally(nextUser, saved.executiveId);
+      setEditing(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo guardar el usuario.";
+      setErrorMessage(message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -57,7 +164,7 @@ export function SettingsView() {
         <div className="card metric"><span className="muted">Usuarios activos</span><strong>{state.users.filter((u) => u.status === "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Usuarios inactivos</span><strong>{state.users.filter((u) => u.status !== "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Roles creados</span><strong>{roles.length}</strong></div>
-        <div className="card metric"><span className="muted">Alertas seguridad</span><strong>0</strong></div>
+        <div className="card metric"><span className="muted">Ejecutivos vinculados</span><strong>{state.executives.length}</strong></div>
       </section>
 
       <section className="card">
@@ -65,8 +172,9 @@ export function SettingsView() {
           <div>
             <p className="eyebrow">Usuarios</p>
             <h2>Usuarios, roles y auditoria</h2>
+            <p className="muted">Al crear un usuario ejecutivo, tambien se crea su registro comercial vinculado.</p>
           </div>
-          <button className="primary-button" onClick={() => setEditing({ id: crypto.randomUUID(), fullName: "", email: "", role: "Ejecutivo", area: "Ventas", status: "Pendiente", lastAccess: "Sin acceso", createdAt: new Date().toISOString().slice(0, 10) })}>
+          <button className="primary-button" onClick={() => openEditor()}>
             <UserPlus size={18} />
             Crear usuario
           </button>
@@ -76,17 +184,22 @@ export function SettingsView() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar usuario" />
         </div>
         <table className="table">
-          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Area</th><th>Estado</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Area</th><th>Estado</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead>
           <tbody>
             {users.map((user) => (
               <tr key={user.id}>
-                <td><strong>{user.fullName}</strong></td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {user.avatarUrl ? <img className="avatar" src={user.avatarUrl} alt={user.fullName} /> : <span className="avatar">{user.fullName.slice(0, 2).toUpperCase()}</span>}
+                    <strong>{user.fullName}</strong>
+                  </div>
+                </td>
                 <td>{user.email}</td>
                 <td>{user.role}</td>
                 <td>{user.area}</td>
                 <td><span className="badge">{user.status}</span></td>
                 <td>{user.lastAccess}</td>
-                <td><button className="ghost-button" onClick={() => setEditing(user)}>Editar</button></td>
+                <td><button className="ghost-button" onClick={() => openEditor(user)}>Editar</button></td>
               </tr>
             ))}
           </tbody>
@@ -126,20 +239,46 @@ export function SettingsView() {
           <div className="modal">
             <p className="eyebrow">Usuario</p>
             <h2>{editing.fullName || "Nuevo usuario"}</h2>
-            <div className="form-grid">
-              <div className="field"><label>Nombre completo</label><input value={editing.fullName} onChange={(event) => setEditing({ ...editing, fullName: event.target.value })} /></div>
-              <div className="field"><label>Correo</label><input value={editing.email} onChange={(event) => setEditing({ ...editing, email: event.target.value })} /></div>
-              <div className="field"><label>Area</label><input value={editing.area} onChange={(event) => setEditing({ ...editing, area: event.target.value })} /></div>
-              <div className="field"><label>Rol</label><select value={editing.role} onChange={(event) => setEditing({ ...editing, role: event.target.value })}>{roles.map((role) => <option key={role}>{role}</option>)}</select></div>
-              <div className="field"><label>Estado</label><select value={editing.status} onChange={(event) => setEditing({ ...editing, status: event.target.value as UserProfile["status"] })}><option>Activo</option><option>Inactivo</option><option>Pendiente</option><option>Bloqueado</option><option>Archivado</option></select></div>
+            <div className="grid grid-2" style={{ marginTop: 12 }}>
+              <div className="card" style={{ boxShadow: "none" }}>
+                <div style={{ display: "grid", placeItems: "center", gap: 14 }}>
+                  {editing.avatarUrl ? <img className="avatar" src={editing.avatarUrl} alt={editing.fullName} style={{ width: 128, height: 128 }} /> : <span className="avatar" style={{ width: 128, height: 128, fontSize: 28 }}>RF</span>}
+                  <label className="ghost-button">
+                    <Camera size={16} />
+                    Subir foto
+                    <input hidden type="file" accept="image/*" onChange={(event) => readAvatar(event.target.files?.[0])} />
+                  </label>
+                </div>
+              </div>
+              <div className="form-grid">
+                <div className="field"><label>Nombre completo</label><input value={editing.fullName} onChange={(event) => setEditing({ ...editing, fullName: event.target.value })} /></div>
+                <div className="field"><label>Correo</label><input value={editing.email} onChange={(event) => setEditing({ ...editing, email: event.target.value })} /></div>
+                <div className="field"><label>Contrasena inicial</label><input type="password" value={editing.password ?? ""} onChange={(event) => setEditing({ ...editing, password: event.target.value })} /></div>
+                <div className="field"><label>Area</label><input value={editing.area} onChange={(event) => setEditing({ ...editing, area: event.target.value })} /></div>
+                <div className="field"><label>Rol</label><select value={editing.role} onChange={(event) => setEditing({ ...editing, role: event.target.value })}>{roles.map((role) => <option key={role}>{role}</option>)}</select></div>
+                <div className="field"><label>Estado</label><select value={editing.status} onChange={(event) => setEditing({ ...editing, status: event.target.value as UserProfile["status"] })}><option>Activo</option><option>Pendiente</option><option>Inactivo</option><option>Bloqueado</option><option>Archivado</option></select></div>
+              </div>
             </div>
+
+            {isExecutiveRole(editing.role) && (
+              <div className="card" style={{ boxShadow: "none", marginTop: 16 }}>
+                <p className="eyebrow">Ficha comercial vinculada</p>
+                <div className="form-grid">
+                  <div className="field"><label>Codigo ejecutivo</label><input value={editing.code ?? ""} onChange={(event) => setEditing({ ...editing, code: event.target.value })} placeholder="Ej. E-120" /></div>
+                  <div className="field"><label>Turno</label><select value={editing.shift ?? "Manana"} onChange={(event) => setEditing({ ...editing, shift: event.target.value as UserProfile["shift"] })}><option>Manana</option><option>Tarde</option><option>Noche</option></select></div>
+                  <div className="field"><label>Equipo</label><select value={editing.teamId ?? ""} onChange={(event) => setEditing({ ...editing, teamId: event.target.value })}><option value="">Sin equipo</option>{state.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></div>
+                </div>
+              </div>
+            )}
+
             <div className="card" style={{ boxShadow: "none", marginTop: 16 }}>
               <strong>Permisos heredados</strong>
-              <p className="muted">El rol seleccionado define acceso a modulos, edicion, auditoria y exportacion.</p>
+              <p className="muted">El rol seleccionado define navegacion, permisos y saludo personalizado. Los usuarios ejecutivos quedan vinculados automaticamente al directorio comercial.</p>
+              {errorMessage ? <p style={{ color: "#FF3B30", marginTop: 10 }}>{errorMessage}</p> : null}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
               <button className="ghost-button" onClick={() => setEditing(null)}>Cancelar</button>
-              <button className="primary-button" onClick={() => saveUser(editing)}>Guardar usuario</button>
+              <button className="primary-button" onClick={() => saveUser(editing)} disabled={saving}>{saving ? "Guardando..." : "Guardar usuario"}</button>
             </div>
           </div>
         </div>

@@ -103,7 +103,8 @@ export const seedState: CommercialState = {
       area: "Gerencia Comercial",
       status: "Activo",
       lastAccess: "Hoy 09:42",
-      createdAt: "2026-06-11"
+      createdAt: "2026-06-11",
+      avatarUrl: "/avatars/gerencia.svg"
     }
   ],
   audit: [

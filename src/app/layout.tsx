@@ -4,7 +4,10 @@ import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
   title: "Rebagliati Modulo Comercial",
-  description: "Ranking, control de ventas y mapa comercial interno"
+  description: "Ranking, control de ventas y mapa comercial interno",
+  icons: {
+    icon: "/brand/favicon.png"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -18,8 +18,15 @@ import {
   Trophy,
   UsersRound
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+
+type SessionHeaderProfile = {
+  fullName: string;
+  role: string;
+  avatarUrl?: string | null;
+  greeting?: string;
+};
 
 const navItems = [
   { href: "/dashboard", label: "Resumen mensual", icon: LayoutDashboard },
@@ -36,6 +43,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [profile, setProfile] = useState<SessionHeaderProfile | null>(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -50,6 +58,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.includes("goals")) return "Metas comerciales";
     return "Ranking de Ventas - Junio 2026";
   }, [pathname]);
+
+  useEffect(() => {
+    if (pathname === "/login") return;
+    let mounted = true;
+    fetch("/api/session/me", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (mounted && payload?.data) setProfile(payload.data);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
+
+  const visibleNavItems = useMemo(() => {
+    const role = profile?.role.toLowerCase() ?? "";
+    if (role.includes("ejecutivo") && !role.includes("lider")) {
+      return navItems.filter((item) =>
+        ["/dashboard", "/sales/new", "/ranking", "/teams", "/customer-map", "/reports"].includes(item.href)
+      );
+    }
+    if (role.includes("marketing") || role.includes("solo lectura") || role.includes("marketing_soporte")) {
+      return navItems.filter((item) =>
+        ["/dashboard", "/ranking", "/teams", "/customer-map", "/reports"].includes(item.href)
+      );
+    }
+    return navItems;
+  }, [profile?.role]);
 
   if (pathname === "/login") {
     return <>{children}</>;
@@ -68,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {collapsed ? <ChevronRight size={19} /> : <ChevronLeft size={19} />}
           </button>
           <div className="brand">
-            <div className="brand-mark">R</div>
+            <div className="brand-mark"><img src="/brand/rebagliati-logo.webp" alt="Rebagliati" /></div>
             <div className="brand-text">
               <strong>Rebagliati</strong>
               <div className="muted" style={{ fontSize: 12 }}>Modulo comercial</div>
@@ -83,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="sidebar-section">Dashboard</div>
         <nav className="nav">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
@@ -107,10 +144,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div>
             <p className="eyebrow">Panel interno</p>
             <h1>{title}</h1>
+            {profile?.greeting ? <p className="muted" style={{ marginTop: 8 }}>{profile.greeting}</p> : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="badge">Junio 2026</span>
-            <span className="badge">Gerencia Comercial</span>
+            <span className="badge">
+              {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={profile.fullName} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover" }} /> : null}
+              {profile?.fullName ?? "Gerencia Comercial"}
+            </span>
             <button className="danger-button" onClick={logout}>
               <LogOut size={16} />
               Cerrar sesion

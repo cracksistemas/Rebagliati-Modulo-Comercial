@@ -33,7 +33,7 @@ export default function LoginPage() {
     <div className="modal-backdrop" style={{ background: "#F5F5F7" }}>
       <section className="card" style={{ width: "min(440px, 92vw)" }}>
         <div className="brand" style={{ marginBottom: 22 }}>
-          <div className="brand-mark">R</div>
+          <div className="brand-mark"><img src="/brand/rebagliati-logo.webp" alt="Rebagliati" /></div>
           <div>
             <strong>Rebagliati Diplomados</strong>
             <div className="muted">Modulo comercial interno</div>
