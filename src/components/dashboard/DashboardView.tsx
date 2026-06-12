@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Link2, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getCommercialState, getValidatedSales, money } from "@/lib/commercial/store";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
@@ -19,6 +19,14 @@ function rankExecutives(state: CommercialState) {
     .filter((item) => item.status === "Activo")
     .sort((a, b) => b.points - a.points || b.currentSales - a.currentSales);
 }
+
+type KommoResponseMetric = {
+  connected: boolean;
+  source: string;
+  averageResponseLabel: string;
+  averageResponseSeconds: number;
+  samples: number;
+};
 
 function BattleCard({ leaders, total }: { leaders: Executive[]; total: number }) {
   const [first, second] = leaders;
@@ -48,8 +56,32 @@ function BattleCard({ leaders, total }: { leaders: Executive[]; total: number })
 
 export function DashboardView() {
   const [state, setState] = useState(getCommercialState);
+  const [kommoMetric, setKommoMetric] = useState<KommoResponseMetric | null>(null);
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/kommo/metrics/response-time", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (mounted && payload?.data) setKommoMetric(payload.data);
+      })
+      .catch(() => {
+        if (mounted) {
+          setKommoMetric({
+            connected: false,
+            source: "fallback",
+            averageResponseLabel: state.avgResponseTime,
+            averageResponseSeconds: 462,
+            samples: 0
+          });
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [state.avgResponseTime]);
 
   const metrics = useMemo(() => {
     const validated = getValidatedSales(state);
@@ -72,7 +104,14 @@ export function DashboardView() {
         <div className="card metric"><span className="muted">Meta mensual</span><strong>{money(state.companyGoal)}</strong></div>
         <div className="card metric"><span className="muted">Acumulado</span><strong>{money(metrics.accumulated)}</strong></div>
         <div className="card metric"><span className="muted">Avance</span><strong>{metrics.progress.toFixed(2)}%</strong><div className="progress"><span style={{ width: `${Math.min(metrics.progress, 100)}%` }} /></div></div>
-        <div className="card metric"><span className="muted">Tiempo respuesta</span><strong>{state.avgResponseTime}</strong></div>
+        <div className="card metric">
+          <span className="muted">Tiempo respuesta</span>
+          <strong>{kommoMetric?.averageResponseLabel ?? state.avgResponseTime}</strong>
+          <span className="badge" style={{ width: "fit-content" }}>
+            <Link2 size={14} />
+            {kommoMetric?.connected ? "Kommo conectado" : "Kommo fallback"}
+          </span>
+        </div>
       </section>
 
       <section className="grid grid-2">
@@ -129,6 +168,7 @@ export function DashboardView() {
           <p className="eyebrow">Alertas</p>
           <h2>Validacion</h2>
           <p className="badge"><AlertTriangle size={16} /> {metrics.pending} ventas pendientes</p>
+          <p className="badge"><Link2 size={16} /> CRM: {kommoMetric?.source ?? "cargando"}</p>
           <p className="muted">Las ventas pendientes no impactan el ranking oficial hasta validarse.</p>
         </div>
         <div className="card">
