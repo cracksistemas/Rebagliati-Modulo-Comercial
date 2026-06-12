@@ -56,6 +56,17 @@ function parseDataUrl(dataUrl?: string) {
   };
 }
 
+function getErrorMessage(error: unknown, fallback = "No se pudo crear el usuario.") {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error) {
+    const maybeError = error as { message?: string; details?: string; hint?: string; code?: string };
+    const parts = [maybeError.message, maybeError.details, maybeError.hint, maybeError.code ? `Codigo: ${maybeError.code}` : ""].filter(Boolean);
+    if (parts.length) return parts.join(" ");
+  }
+  if (typeof error === "string" && error.trim()) return error;
+  return fallback;
+}
+
 async function uploadAvatar(admin: ReturnType<typeof createAdminClient>, userId: string, avatarDataUrl?: string) {
   const parsed = parseDataUrl(avatarDataUrl);
   if (!parsed) return null;
@@ -94,12 +105,16 @@ export async function POST(request: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
+  let stage = "inicio";
+
   try {
+    stage = "leer payload";
     const payload = (await request.json()) as CreateUserPayload;
     if (!payload.fullName?.trim() || !payload.email?.trim() || !payload.role?.trim()) {
       return NextResponse.json({ ok: false, error: "Nombre, correo y rol son obligatorios." }, { status: 400 });
     }
 
+    stage = "crear cliente admin";
     const admin = createAdminClient();
     const shouldCreate = !isUuid(payload.id);
     const password = payload.password?.trim();
@@ -111,6 +126,7 @@ export async function POST(request: NextRequest) {
     let userId = payload.id;
 
     if (shouldCreate) {
+      stage = "crear usuario en Supabase Auth";
       const { data, error } = await admin.auth.admin.createUser({
         email: payload.email.trim(),
         password,
@@ -124,6 +140,7 @@ export async function POST(request: NextRequest) {
       if (error) throw error;
       userId = data.user.id;
     } else if (userId) {
+      stage = "actualizar usuario en Supabase Auth";
       const { error } = await admin.auth.admin.updateUserById(userId, {
         email: payload.email.trim(),
         password: password || undefined,
@@ -138,9 +155,11 @@ export async function POST(request: NextRequest) {
 
     if (!userId) throw new Error("No se pudo resolver el usuario creado.");
 
+    stage = "subir foto";
     const uploadedAvatarUrl = await uploadAvatar(admin, userId, payload.avatarDataUrl);
     const avatarUrl = uploadedAvatarUrl ?? payload.avatarUrl ?? null;
 
+    stage = "guardar perfil";
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,
       full_name: payload.fullName.trim(),
@@ -167,12 +186,10 @@ export async function POST(request: NextRequest) {
         full_name: payload.fullName.trim(),
         photo_url: avatarUrl,
         shift: payload.shift ?? "Manana",
-        status: normalizeStatus(payload.status) ? "Activo" : "Inactivo",
-        goal_amount: 0,
-        current_sales: 0,
-        points: 0
+        status: normalizeStatus(payload.status) ? "Activo" : "Inactivo"
       };
 
+      stage = "guardar ejecutivo";
       const { data: executive, error: executiveError } = await admin
         .from("executives")
         .upsert(executivePayload)
@@ -182,6 +199,7 @@ export async function POST(request: NextRequest) {
       executiveId = executive.id;
 
       if (payload.teamId) {
+        stage = "asignar equipo";
         await admin.from("team_members").update({ active: false, end_date: new Date().toISOString().slice(0, 10) }).eq("executive_id", executiveId);
         const { error: memberError } = await admin.from("team_members").insert({
           team_id: payload.teamId,
@@ -193,7 +211,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await admin.from("audit_logs").insert({
+    stage = "registrar auditoria";
+    const { error: auditError } = await admin.from("audit_logs").insert({
       table_name: "profiles",
       record_id: userId,
       action: shouldCreate ? "create_user" : "update_user",
@@ -204,6 +223,9 @@ export async function POST(request: NextRequest) {
         executive_id: executiveId
       }
     });
+    if (auditError) {
+      console.error("No se pudo registrar auditoria de usuario", auditError);
+    }
 
     return NextResponse.json({
       ok: true,
@@ -219,7 +241,8 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo crear el usuario.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const message = getErrorMessage(error);
+    console.error(`Error en /api/admin/users durante etapa: ${stage}`, error);
+    return NextResponse.json({ ok: false, error: message, stage }, { status: 500 });
   }
 }

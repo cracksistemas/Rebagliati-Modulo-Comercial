@@ -177,14 +177,15 @@ export function SettingsView() {
         body: JSON.stringify(user)
       });
       const rawResponse = await response.text();
-      let payload: { ok?: boolean; error?: string; data?: any };
+      let payload: { ok?: boolean; error?: string; stage?: string; data?: any };
       try {
         payload = rawResponse ? JSON.parse(rawResponse) : {};
       } catch {
         throw new Error(rawResponse.slice(0, 180) || "El servidor devolvio una respuesta no valida.");
       }
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "No se pudo crear el usuario.");
+        const stage = payload.stage ? ` Etapa: ${payload.stage}.` : "";
+        throw new Error(`${payload.error ?? "No se pudo crear el usuario."}${stage}`);
       }
 
       const saved = payload.data;
