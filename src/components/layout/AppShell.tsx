@@ -22,6 +22,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
 
 type SessionHeaderProfile = {
   fullName: string;
@@ -71,6 +72,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (mounted && payload?.data) setProfile(payload.data);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname === "/login") return;
+    let mounted = true;
+    fetch("/api/commercial/snapshot", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!mounted || !payload?.ok || !payload.data) return;
+        const current = getCommercialState();
+        const next = {
+          ...current,
+          teams: Array.isArray(payload.data.teams) ? payload.data.teams : current.teams,
+          executives: Array.isArray(payload.data.executives) ? payload.data.executives : current.executives,
+          sales: Array.isArray(payload.data.sales) ? payload.data.sales : current.sales
+        };
+        setCommercialState(next);
       })
       .catch(() => undefined);
     return () => {
