@@ -5,7 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 const publicPaths = new Set([
   "/login",
   "/api/kommo/oauth/callback",
-  "/api/kommo/webhook"
+  "/api/kommo/webhook",
+  "/api/maintenance/repair-admin-login"
 ]);
 
 function isPublicPath(pathname: string) {
