@@ -3,8 +3,8 @@
 import { ClipboardList, PieChart, Trophy, Pencil, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
-import { getCommercialState, money, upsertTeam } from "@/lib/commercial/store";
-import type { Team } from "@/lib/commercial/types";
+import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
+import type { Executive, Team, UserProfile } from "@/lib/commercial/types";
 
 const emptyTeam: Team = {
   id: "",
@@ -17,17 +17,46 @@ const emptyTeam: Team = {
 export function TeamsView() {
   const [state, setState] = useState(getCommercialState);
   const [editing, setEditing] = useState<Team | null>(null);
+  const [editingMembers, setEditingMembers] = useState<string[]>([]);
+  const [saveStatus, setSaveStatus] = useState("");
   const [detail, setDetail] = useState<{ team: Team; view: "members" | "sales" | "ranking" | "mix" } | null>(null);
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
   const total = useMemo(() => state.executives.reduce((sum, item) => sum + item.currentSales, 0), [state.executives]);
+  const uniqueExecutives = useMemo(() => dedupeExecutives(state.executives).filter((item) => item.status !== "Baja"), [state.executives]);
+  const leaderOptions = useMemo(() => buildLeaderOptions(state.users, uniqueExecutives), [state.users, uniqueExecutives]);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadUsers() {
+      try {
+        const response = await fetch("/api/admin/users", { cache: "no-store" });
+        const payload = (await response.json()) as { ok?: boolean; data?: { users?: UserProfile[] } };
+        if (!alive || !response.ok || !payload.ok || !payload.data?.users) return;
+        setState((current) => {
+          const next = { ...current, users: dedupeUsers(payload.data?.users ?? []) };
+          setCommercialState(next);
+          return next;
+        });
+      } catch {
+        // Si no tiene permisos administrativos, se usan los ejecutivos visibles.
+      }
+    }
+    loadUsers();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function openEditor(team?: Team) {
-    setEditing(team ?? { ...emptyTeam, id: crypto.randomUUID() });
+    const draft = team ?? { ...emptyTeam, id: crypto.randomUUID() };
+    setEditing(draft);
+    setEditingMembers(uniqueExecutives.filter((executive) => executive.teamId === draft.id).map((executive) => executive.id));
+    setSaveStatus("");
   }
 
   function teamMembers(team: Team) {
-    return state.executives.filter((item) => item.teamId === team.id && item.status === "Activo");
+    return uniqueExecutives.filter((item) => item.teamId === team.id && item.status === "Activo");
   }
 
   function teamSales(team: Team) {
@@ -49,6 +78,41 @@ export function TeamsView() {
     });
   }
 
+  function toggleMember(executiveId: string) {
+    setEditingMembers((current) => current.includes(executiveId) ? current.filter((id) => id !== executiveId) : [...current, executiveId]);
+  }
+
+  async function saveTeam() {
+    if (!editing) return;
+    setSaveStatus("Guardando equipo...");
+    try {
+      const response = await fetch("/api/commercial/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editing, memberIds: editingMembers })
+      });
+      const payload = (await response.json()) as { ok?: boolean; error?: string; data?: { team?: Team; memberIds?: string[] } };
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "No se pudo guardar el equipo.");
+
+      const savedTeam = payload.data?.team ?? editing;
+      const memberIds = new Set(payload.data?.memberIds ?? editingMembers);
+      const next = {
+        ...state,
+        teams: state.teams.some((team) => team.id === savedTeam.id) ? state.teams.map((team) => (team.id === savedTeam.id ? savedTeam : team)) : [savedTeam, ...state.teams],
+        executives: uniqueExecutives.map((executive) => {
+          if (memberIds.has(executive.id)) return { ...executive, teamId: savedTeam.id };
+          if (executive.teamId === savedTeam.id) return { ...executive, teamId: "" };
+          return executive;
+        })
+      };
+      setState(next);
+      setCommercialState(next);
+      setEditing(null);
+    } catch (error) {
+      setSaveStatus(error instanceof Error ? error.message : "No se pudo guardar el equipo.");
+    }
+  }
+
   return (
     <div className="grid">
       <section className="card">
@@ -65,7 +129,7 @@ export function TeamsView() {
         {state.teams.map((team) => {
           const members = teamMembers(team);
           const amount = members.reduce((sum, item) => sum + item.currentSales, 0);
-          const leader = state.executives.find((item) => item.id === team.leaderId);
+          const leader = uniqueExecutives.find((item) => item.id === team.leaderId);
           return (
             <article className="card" key={team.id}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -107,7 +171,7 @@ export function TeamsView() {
                 <label>Lider del equipo</label>
                 <select value={editing.leaderId ?? ""} onChange={(event) => setEditing({ ...editing, leaderId: event.target.value })}>
                   <option value="">Sin lider</option>
-                  {state.executives.map((executive) => <option key={executive.id} value={executive.id}>{executive.fullName}</option>)}
+                  {leaderOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </div>
               <div className="field">
@@ -129,12 +193,12 @@ export function TeamsView() {
             <div style={{ marginTop: 16 }}>
               <p className="eyebrow">Ejecutivos asignados</p>
               <div className="grid grid-2">
-                {state.executives.map((executive) => (
+                {uniqueExecutives.map((executive) => (
                   <label key={executive.id} className="card" style={{ boxShadow: "none", display: "flex", gap: 10, alignItems: "center" }}>
                     <input
                       type="checkbox"
-                      checked={executive.teamId === editing.id}
-                      readOnly
+                      checked={editingMembers.includes(executive.id)}
+                      onChange={() => toggleMember(executive.id)}
                     />
                     <span>{executive.fullName}</span>
                     <span className="muted">{money(executive.currentSales)}</span>
@@ -144,8 +208,9 @@ export function TeamsView() {
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
               <button className="ghost-button" onClick={() => setEditing(null)}>Cancelar</button>
-              <button className="primary-button" onClick={() => { upsertTeam(editing); setEditing(null); }}>Guardar equipo</button>
+              <button className="primary-button" onClick={saveTeam}>Guardar equipo</button>
             </div>
+            {saveStatus ? <p className="muted" style={{ marginTop: 10 }}>{saveStatus}</p> : null}
           </div>
         </div>
       )}
@@ -187,7 +252,7 @@ export function TeamsView() {
                     {teamSales(detail.team).map((sale) => (
                       <tr key={sale.id}>
                         <td>{sale.saleDate}</td>
-                        <td>{state.executives.find((item) => item.id === sale.executiveId)?.fullName ?? "Sin ejecutivo"}</td>
+                        <td>{uniqueExecutives.find((item) => item.id === sale.executiveId)?.fullName ?? "Sin ejecutivo"}</td>
                         <td>{sale.productName}</td>
                         <td>{sale.productType}</td>
                         <td>{sale.quantity}</td>
@@ -237,4 +302,39 @@ export function TeamsView() {
       )}
     </div>
   );
+}
+
+function dedupeExecutives(executives: Executive[]) {
+  const byKey = new Map<string, Executive>();
+  executives.forEach((executive) => {
+    const key = executive.id || executive.fullName.trim().toLowerCase();
+    const existing = byKey.get(key);
+    if (!existing || existing.status === "Baja") byKey.set(key, executive);
+  });
+  return Array.from(byKey.values());
+}
+
+function dedupeUsers(users: UserProfile[]) {
+  const byEmail = new Map<string, UserProfile>();
+  users.forEach((user) => {
+    const key = user.email.trim().toLowerCase() || user.id;
+    if (!byEmail.has(key)) byEmail.set(key, user);
+  });
+  return Array.from(byEmail.values());
+}
+
+function buildLeaderOptions(users: UserProfile[], executives: Executive[]) {
+  const options = new Map<string, { value: string; label: string }>();
+  users.forEach((user) => {
+    options.set(user.executiveId || user.id, {
+      value: user.executiveId || user.id,
+      label: `${user.fullName} - ${user.role}${user.email ? ` - ${user.email}` : ""}`
+    });
+  });
+  executives.forEach((executive) => {
+    if (!options.has(executive.id)) {
+      options.set(executive.id, { value: executive.id, label: `${executive.fullName} - Ejecutivo` });
+    }
+  });
+  return Array.from(options.values()).sort((a, b) => a.label.localeCompare(b.label));
 }
