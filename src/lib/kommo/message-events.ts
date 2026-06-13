@@ -19,6 +19,26 @@ export type KommoMessageEvent = {
   rawPayload: unknown;
 };
 
+export type SupabasePersistenceError = {
+  code?: string;
+  message: string;
+  details?: string;
+  hint?: string;
+};
+
+type KommoWebhookDebugEntry = {
+  contentType: string;
+  bodyReceived: boolean;
+  topLevelKeys: string[];
+  detectedRecords: number;
+  normalizedEvents: number;
+  persistedEvents: number;
+  tableMissing: boolean;
+  supabaseError?: SupabasePersistenceError | null;
+  reason: string;
+  rawPayload: unknown;
+};
+
 function asRecord(value: unknown): UnknownRecord {
   return value && typeof value === "object" ? (value as UnknownRecord) : {};
 }
@@ -97,6 +117,30 @@ function collectRecords(value: unknown, records: UnknownRecord[] = []) {
 
   Object.values(record).forEach((item) => collectRecords(item, records));
   return records;
+}
+
+function summarizeError(error: unknown): SupabasePersistenceError {
+  if (typeof error === "object" && error) {
+    const record = error as { code?: string; message?: string; details?: string; hint?: string };
+    return {
+      code: record.code,
+      message: record.message ?? "Unknown Supabase error",
+      details: record.details,
+      hint: record.hint
+    };
+  }
+  return { message: error instanceof Error ? error.message : "Unknown Supabase error" };
+}
+
+export function getSafeTopLevelKeys(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+  return Object.keys(payload as UnknownRecord)
+    .filter((key) => !/(secret|token|password|authorization|api[_-]?key)/i.test(key))
+    .slice(0, 40);
+}
+
+export function countKommoWebhookCandidateRecords(payload: unknown) {
+  return collectRecords(payload).length;
 }
 
 function inferDirection(record: UnknownRecord) {
@@ -192,30 +236,57 @@ export function normalizeKommoWebhookPayload(payload: unknown) {
 }
 
 export async function persistKommoMessageEvents(events: KommoMessageEvent[]) {
-  if (!events.length) return { inserted: 0, skipped: 0, tableMissing: false };
+  if (!events.length) return { inserted: 0, skipped: 0, tableMissing: false, error: null };
 
-  const admin = createAdminClient();
-  const rows = events.map((event) => ({
-    message_id: event.messageId,
-    lead_id: event.leadId ?? null,
-    talk_id: event.talkId ?? null,
-    contact_id: event.contactId ?? null,
-    conversation_id: event.conversationId ?? null,
-    channel: event.channel ?? null,
-    source: event.source ?? null,
-    direction: event.direction,
-    sender_user_id: event.senderUserId ?? null,
-    sender_name: event.senderName ?? null,
-    responsible_user_id: event.responsibleUserId ?? null,
-    responsible_user_name: event.responsibleUserName ?? null,
-    message_created_at: event.messageCreatedAt ?? null,
-    raw_payload: event.rawPayload
-  }));
+  try {
+    const admin = createAdminClient();
+    const rows = events.map((event) => ({
+      message_id: event.messageId,
+      lead_id: event.leadId ?? null,
+      talk_id: event.talkId ?? null,
+      contact_id: event.contactId ?? null,
+      conversation_id: event.conversationId ?? null,
+      channel: event.channel ?? null,
+      source: event.source ?? null,
+      direction: event.direction,
+      sender_user_id: event.senderUserId ?? null,
+      sender_name: event.senderName ?? null,
+      responsible_user_id: event.responsibleUserId ?? null,
+      responsible_user_name: event.responsibleUserName ?? null,
+      message_created_at: event.messageCreatedAt ?? null,
+      raw_payload: event.rawPayload
+    }));
 
-  const { error } = await admin.from("kommo_message_events").upsert(rows, { onConflict: "message_id" });
-  if (!error) return { inserted: rows.length, skipped: 0, tableMissing: false };
-  if (error.code === "42P01" || /kommo_message_events/i.test(error.message)) {
-    return { inserted: 0, skipped: rows.length, tableMissing: true };
+    const { error } = await admin.from("kommo_message_events").upsert(rows, { onConflict: "message_id" });
+    if (!error) return { inserted: rows.length, skipped: 0, tableMissing: false, error: null };
+    const summary = summarizeError(error);
+    if (error.code === "42P01" || /kommo_message_events/i.test(error.message)) {
+      return { inserted: 0, skipped: rows.length, tableMissing: true, error: summary };
+    }
+    return { inserted: 0, skipped: rows.length, tableMissing: false, error: summary };
+  } catch (error) {
+    return { inserted: 0, skipped: events.length, tableMissing: false, error: summarizeError(error) };
   }
-  throw error;
+}
+
+export async function persistKommoWebhookDebug(entry: KommoWebhookDebugEntry) {
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.from("kommo_webhook_debug").insert({
+      content_type: entry.contentType || null,
+      body_received: entry.bodyReceived,
+      top_level_keys: entry.topLevelKeys,
+      detected_records: entry.detectedRecords,
+      normalized_events: entry.normalizedEvents,
+      persisted_events: entry.persistedEvents,
+      table_missing: entry.tableMissing,
+      supabase_error: entry.supabaseError ?? null,
+      reason: entry.reason,
+      raw_payload: entry.rawPayload
+    });
+    if (!error) return { inserted: true, error: null };
+    return { inserted: false, error: summarizeError(error) };
+  } catch (error) {
+    return { inserted: false, error: summarizeError(error) };
+  }
 }
