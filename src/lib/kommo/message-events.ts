@@ -15,7 +15,7 @@ export type KommoMessageEvent = {
   senderName?: string;
   responsibleUserId?: string;
   responsibleUserName?: string;
-  messageCreatedAt: string;
+  messageCreatedAt?: string;
   rawPayload: unknown;
 };
 
@@ -48,7 +48,7 @@ function normalizeTimestamp(value: unknown) {
     const milliseconds = numberValue > 10_000_000_000 ? numberValue : numberValue * 1000;
     return new Date(milliseconds).toISOString();
   }
-  return new Date().toISOString();
+  return undefined;
 }
 
 function setNested(target: UnknownRecord, rawKey: string, value: unknown) {
@@ -158,7 +158,7 @@ function normalizeRecord(record: UnknownRecord, rootPayload: unknown): KommoMess
     record.id,
     message.id,
     message.message_id,
-    `${firstString(record.talk_id, talk.id, record.lead_id, lead.id, record.conversation_id, chat.id) ?? "kommo"}-${normalizeTimestamp(record.created_at ?? message.created_at)}-${direction}`
+    `${firstString(record.talk_id, talk.id, record.lead_id, lead.id, record.conversation_id, chat.id) ?? "kommo"}-${normalizeTimestamp(record.created_at ?? message.created_at) ?? Date.now()}-${direction}`
   );
   if (!messageId) return null;
 
@@ -208,7 +208,7 @@ export async function persistKommoMessageEvents(events: KommoMessageEvent[]) {
     sender_name: event.senderName ?? null,
     responsible_user_id: event.responsibleUserId ?? null,
     responsible_user_name: event.responsibleUserName ?? null,
-    message_created_at: event.messageCreatedAt,
+    message_created_at: event.messageCreatedAt ?? null,
     raw_payload: event.rawPayload
   }));
 

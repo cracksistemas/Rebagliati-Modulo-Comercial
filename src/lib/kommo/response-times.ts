@@ -46,7 +46,9 @@ type StoredMessageEvent = {
   sender_name: string | null;
   responsible_user_id: string | null;
   responsible_user_name: string | null;
-  message_created_at: string;
+  message_created_at: string | null;
+  received_at: string;
+  effective_created_at?: string;
 };
 
 export type KommoDirectoryUser = {
@@ -360,7 +362,7 @@ function eventToMessage(event: StoredMessageEvent): NormalizedMessage {
   return {
     id: event.message_id,
     direction: event.direction,
-    createdAt: normalizeTimestamp(event.message_created_at),
+    createdAt: normalizeTimestamp(event.effective_created_at ?? event.message_created_at ?? event.received_at),
     userId: event.sender_user_id ?? event.responsible_user_id ?? undefined,
     userName: event.sender_name ?? event.responsible_user_name ?? "Usuario Kommo"
   };
@@ -370,16 +372,36 @@ async function loadStoredMessageEvents(searchParams?: URLSearchParams) {
   const admin = createAdminClient();
   const { fromSeconds, toSeconds } = parseDateBoundaries(searchParams);
   let query = admin
-    .from("kommo_message_events")
-    .select("message_id,lead_id,talk_id,contact_id,conversation_id,channel,direction,sender_user_id,sender_name,responsible_user_id,responsible_user_name,message_created_at")
-    .order("message_created_at", { ascending: true });
+    .from("v_kommo_message_events_for_metrics")
+    .select("message_id,lead_id,talk_id,contact_id,conversation_id,channel,direction,sender_user_id,sender_name,responsible_user_id,responsible_user_name,message_created_at,received_at,effective_created_at")
+    .order("effective_created_at", { ascending: true });
 
-  if (fromSeconds) query = query.gte("message_created_at", new Date(fromSeconds * 1000).toISOString());
-  if (toSeconds) query = query.lte("message_created_at", new Date(toSeconds * 1000).toISOString());
+  if (fromSeconds) query = query.gte("effective_created_at", new Date(fromSeconds * 1000).toISOString());
+  if (toSeconds) query = query.lte("effective_created_at", new Date(toSeconds * 1000).toISOString());
 
   const { data, error } = await query;
   if (!error) return { rows: ((data as StoredMessageEvent[] | null) ?? []), tableMissing: false };
-  if (error.code === "42P01" || /kommo_message_events/i.test(error.message)) return { rows: [], tableMissing: true };
+  if (error.code === "42P01" || /v_kommo_message_events_for_metrics/i.test(error.message)) {
+    const fallback = await admin
+      .from("kommo_message_events")
+      .select("message_id,lead_id,talk_id,contact_id,conversation_id,channel,direction,sender_user_id,sender_name,responsible_user_id,responsible_user_name,message_created_at,received_at");
+    if (fallback.error) {
+      if (fallback.error.code === "42P01" || /kommo_message_events/i.test(fallback.error.message)) return { rows: [], tableMissing: true };
+      throw fallback.error;
+    }
+    const rows = (((fallback.data as StoredMessageEvent[] | null) ?? []).map((row) => ({
+      ...row,
+      effective_created_at: row.message_created_at ?? row.received_at
+    })) as StoredMessageEvent[])
+      .filter((row) => {
+        const timestamp = normalizeTimestamp(row.effective_created_at);
+        if (fromSeconds && timestamp < fromSeconds) return false;
+        if (toSeconds && timestamp > toSeconds) return false;
+        return true;
+      })
+      .sort((a, b) => normalizeTimestamp(a.effective_created_at) - normalizeTimestamp(b.effective_created_at));
+    return { rows, tableMissing: false };
+  }
   throw error;
 }
 
