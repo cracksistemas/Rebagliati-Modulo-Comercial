@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { Camera, GitMerge, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, setCommercialState, deactivateExecutive } from "@/lib/commercial/store";
@@ -12,6 +12,14 @@ type EditableExecutive = Executive & {
   email?: string;
   role?: string;
   password?: string;
+};
+
+type MergeResult = {
+  canonicalId: string;
+  fullName: string;
+  email: string;
+  mergedIds: string[];
+  mergedNames: string[];
 };
 
 function initials(name: string) {
@@ -37,6 +45,8 @@ export function ExecutiveManagement() {
   const [photoPreview, setPhotoPreview] = useState("");
   const [crop, setCrop] = useState({ x: 0, y: 0, zoom: 100 });
   const [saveStatus, setSaveStatus] = useState("");
+  const [mergeStatus, setMergeStatus] = useState("");
+  const [merging, setMerging] = useState(false);
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
@@ -147,6 +157,68 @@ export function ExecutiveManagement() {
     }
   }
 
+  async function mergeDuplicateExecutives() {
+    setMerging(true);
+    setMergeStatus("Fusionando duplicados...");
+    try {
+      const response = await fetch("/api/commercial/executives/merge", { method: "POST" });
+      const payload = (await response.json()) as { ok?: boolean; error?: string; data?: { merged?: MergeResult[] } };
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "No se pudieron fusionar duplicados.");
+
+      const merged = payload.data?.merged ?? [];
+      if (!merged.length) {
+        setMergeStatus("No se encontraron duplicados activos para fusionar.");
+        return;
+      }
+
+      const duplicateToCanonical = new Map<string, MergeResult>();
+      merged.forEach((item) => item.mergedIds.forEach((id) => duplicateToCanonical.set(id, item)));
+      const canonicalById = new Map(merged.map((item) => [item.canonicalId, item]));
+      const duplicateIds = new Set([...duplicateToCanonical.keys()]);
+
+      const next = {
+        ...state,
+        executives: state.executives
+          .filter((executive) => !duplicateIds.has(executive.id))
+          .map((executive) => {
+            const canonical = canonicalById.get(executive.id);
+            return canonical ? { ...executive, fullName: canonical.fullName } : executive;
+          }),
+        sales: state.sales.map((sale) => {
+          const canonical = duplicateToCanonical.get(sale.executiveId);
+          return canonical ? { ...sale, executiveId: canonical.canonicalId } : sale;
+        }),
+        incidents: state.incidents.map((incident) => {
+          const executiveCanonical = duplicateToCanonical.get(incident.executiveId);
+          const leaderCanonical = incident.salesLeaderId ? duplicateToCanonical.get(incident.salesLeaderId) : undefined;
+          return {
+            ...incident,
+            executiveId: executiveCanonical?.canonicalId ?? incident.executiveId,
+            executiveName: executiveCanonical?.fullName ?? incident.executiveName,
+            salesLeaderId: leaderCanonical?.canonicalId ?? incident.salesLeaderId,
+            salesLeaderName: leaderCanonical?.fullName ?? incident.salesLeaderName
+          };
+        }),
+        teams: state.teams.map((team) => {
+          const canonical = team.leaderId ? duplicateToCanonical.get(team.leaderId) : undefined;
+          return canonical ? { ...team, leaderId: canonical.canonicalId } : team;
+        }),
+        users: state.users.map((user) => {
+          if (!user.executiveId) return user;
+          const canonical = duplicateToCanonical.get(user.executiveId);
+          return canonical ? { ...user, executiveId: canonical.canonicalId, fullName: canonical.fullName, email: canonical.email || user.email } : user;
+        })
+      };
+      setState(next);
+      setCommercialState(next);
+      setMergeStatus(`${merged.length} grupo(s) fusionado(s).`);
+    } catch (error) {
+      setMergeStatus(error instanceof Error ? error.message : "No se pudieron fusionar duplicados.");
+    } finally {
+      setMerging(false);
+    }
+  }
+
   return (
     <section className="card">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -154,11 +226,18 @@ export function ExecutiveManagement() {
           <p className="eyebrow">Ejecutivos</p>
           <h2>Directorio comercial editable</h2>
         </div>
-        <button className="primary-button" onClick={() => openEditor()}>
-          <Plus size={18} />
-          Agregar ejecutivo
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button className="ghost-button" onClick={mergeDuplicateExecutives} disabled={merging}>
+            <GitMerge size={18} />
+            {merging ? "Fusionando..." : "Fusionar duplicados"}
+          </button>
+          <button className="primary-button" onClick={() => openEditor()}>
+            <Plus size={18} />
+            Agregar ejecutivo
+          </button>
+        </div>
       </div>
+      {mergeStatus ? <p className="muted" style={{ marginTop: 10 }}>{mergeStatus}</p> : null}
       <table className="table">
         <thead>
           <tr>
