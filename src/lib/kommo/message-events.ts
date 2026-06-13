@@ -282,7 +282,7 @@ export async function persistKommoMessageEvents(events: KommoMessageEvent[]) {
 export async function persistKommoWebhookDebug(entry: KommoWebhookDebugEntry) {
   try {
     const admin = createAdminClient();
-    const { error } = await admin.from("kommo_webhook_debug").insert({
+    const row = {
       content_type: entry.contentType || null,
       body_received: entry.bodyReceived,
       top_level_keys: entry.topLevelKeys,
@@ -294,8 +294,15 @@ export async function persistKommoWebhookDebug(entry: KommoWebhookDebugEntry) {
       reason: entry.reason,
       raw_body: entry.rawBody ?? null,
       raw_payload: entry.rawPayload
-    });
+    };
+    const { error } = await admin.from("kommo_webhook_debug").insert(row);
     if (!error) return { inserted: true, error: null };
+    if (/raw_body/i.test(error.message) || error.code === "PGRST204") {
+      const { raw_body: _rawBody, ...rowWithoutRawBody } = row;
+      const retry = await admin.from("kommo_webhook_debug").insert(rowWithoutRawBody);
+      if (!retry.error) return { inserted: true, error: null };
+      return { inserted: false, error: summarizeError(retry.error) };
+    }
     return { inserted: false, error: summarizeError(error) };
   } catch (error) {
     return { inserted: false, error: summarizeError(error) };

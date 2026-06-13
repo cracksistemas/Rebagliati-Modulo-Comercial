@@ -7,6 +7,7 @@ import {
   persistKommoMessageEvents,
   persistKommoWebhookDebug
 } from "@/lib/kommo/message-events";
+import { getAdminSupabaseProjectRef } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
   const bodyReceived = rawBody.trim().length > 0;
   const topLevelKeys = getSafeTopLevelKeys(payload);
   const detectedRecords = countKommoWebhookCandidateRecords(payload);
+  const supabaseProjectRef = getAdminSupabaseProjectRef();
 
   const expectedSecret = process.env.KOMMO_WEBHOOK_SECRET?.trim();
   const receivedSecret =
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
         bodyReceived,
         topLevelKeys,
         detectedRecords,
+        supabaseProjectRef,
         reason: "invalid_secret"
       })
     );
@@ -91,7 +94,8 @@ export async function POST(request: NextRequest) {
       bodyReceived,
       topLevelKeys,
       detectedRecords,
-      normalizedEvents: events.length
+      normalizedEvents: events.length,
+      supabaseProjectRef
     })
   );
 
@@ -121,26 +125,36 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let debugResult: Awaited<ReturnType<typeof persistKommoWebhookDebug>> | null = null;
-  if (!events.length || persistence.error || persistence.tableMissing) {
-    debugResult = await persistKommoWebhookDebug({
-      contentType,
-      rawBody,
-      bodyReceived,
-      topLevelKeys,
-      detectedRecords,
-      normalizedEvents: events.length,
-      persistedEvents: persistence.inserted,
-      tableMissing: persistence.tableMissing,
-      supabaseError: persistence.error,
-      reason: !events.length ? "no_normalized_events" : persistence.tableMissing ? "message_table_missing" : "insert_failed",
-      rawPayload: payload
-    });
-    if (debugResult.error) {
-      console.error("Kommo webhook debug insert failed", JSON.stringify({ error: debugResult.error }));
-    } else {
-      console.info("Kommo webhook debug insert result", JSON.stringify({ inserted: debugResult.inserted }));
-    }
+  const debugReason = !events.length
+    ? "no_normalized_events"
+    : persistence.tableMissing
+      ? "message_table_missing"
+      : persistence.error
+        ? "insert_failed"
+        : "received";
+  const debugResult = await persistKommoWebhookDebug({
+    contentType,
+    rawBody,
+    bodyReceived,
+    topLevelKeys,
+    detectedRecords,
+    normalizedEvents: events.length,
+    persistedEvents: persistence.inserted,
+    tableMissing: persistence.tableMissing,
+    supabaseError: persistence.error,
+    reason: debugReason,
+    rawPayload: payload
+  });
+  if (debugResult.error) {
+    console.error(
+      "Kommo webhook debug insert failed",
+      JSON.stringify({ supabaseProjectRef, reason: debugReason, error: debugResult.error })
+    );
+  } else {
+    console.info(
+      "Kommo webhook debug insert result",
+      JSON.stringify({ supabaseProjectRef, reason: debugReason, inserted: debugResult.inserted })
+    );
   }
 
   return NextResponse.json({
@@ -151,6 +165,7 @@ export async function POST(request: NextRequest) {
     bodyReceived,
     topLevelKeys,
     detectedRecords,
+    supabaseProjectRef,
     normalizedEvents: events.length,
     persistedEvents: persistence.inserted,
     tableMissing: persistence.tableMissing,
