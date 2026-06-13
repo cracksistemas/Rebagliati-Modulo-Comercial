@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { formEntriesToObject, normalizeKommoWebhookPayload, persistKommoMessageEvents } from "@/lib/kommo/message-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,11 +18,15 @@ export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json")
     ? await request.json()
-    : Object.fromEntries((await request.formData()).entries());
+    : formEntriesToObject((await request.formData()).entries());
+  const events = normalizeKommoWebhookPayload(payload);
+  const persistence = await persistKommoMessageEvents(events);
 
   return NextResponse.json({
     ok: true,
     receivedAt: new Date().toISOString(),
-    payload
+    normalizedEvents: events.length,
+    persistedEvents: persistence.inserted,
+    tableMissing: persistence.tableMissing
   });
 }

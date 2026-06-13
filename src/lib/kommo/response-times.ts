@@ -1,4 +1,5 @@
 import { kommoChatsRequest, kommoRequest } from "@/lib/kommo/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -31,6 +32,21 @@ type ReplyWindow = {
 type OpenWindow = {
   conversationId: string;
   incomingAt: number;
+};
+
+type StoredMessageEvent = {
+  message_id: string;
+  lead_id: number | null;
+  talk_id: number | null;
+  contact_id: number | null;
+  conversation_id: string | null;
+  channel: string | null;
+  direction: "incoming" | "outgoing";
+  sender_user_id: string | null;
+  sender_name: string | null;
+  responsible_user_id: string | null;
+  responsible_user_name: string | null;
+  message_created_at: string;
 };
 
 export type KommoDirectoryUser = {
@@ -330,7 +346,122 @@ function fallbackMetrics(status: "Sincronizado" | "Pendiente de sincronizacion" 
   };
 }
 
+function eventConversationId(event: StoredMessageEvent) {
+  return (
+    event.conversation_id ||
+    (event.talk_id ? `talk-${event.talk_id}` : "") ||
+    (event.lead_id ? `lead-${event.lead_id}` : "") ||
+    (event.contact_id ? `contact-${event.contact_id}` : "") ||
+    "sin-conversacion"
+  );
+}
+
+function eventToMessage(event: StoredMessageEvent): NormalizedMessage {
+  return {
+    id: event.message_id,
+    direction: event.direction,
+    createdAt: normalizeTimestamp(event.message_created_at),
+    userId: event.sender_user_id ?? event.responsible_user_id ?? undefined,
+    userName: event.sender_name ?? event.responsible_user_name ?? "Usuario Kommo"
+  };
+}
+
+async function loadStoredMessageEvents(searchParams?: URLSearchParams) {
+  const admin = createAdminClient();
+  const { fromSeconds, toSeconds } = parseDateBoundaries(searchParams);
+  let query = admin
+    .from("kommo_message_events")
+    .select("message_id,lead_id,talk_id,contact_id,conversation_id,channel,direction,sender_user_id,sender_name,responsible_user_id,responsible_user_name,message_created_at")
+    .order("message_created_at", { ascending: true });
+
+  if (fromSeconds) query = query.gte("message_created_at", new Date(fromSeconds * 1000).toISOString());
+  if (toSeconds) query = query.lte("message_created_at", new Date(toSeconds * 1000).toISOString());
+
+  const { data, error } = await query;
+  if (!error) return { rows: ((data as StoredMessageEvent[] | null) ?? []), tableMissing: false };
+  if (error.code === "42P01" || /kommo_message_events/i.test(error.message)) return { rows: [], tableMissing: true };
+  throw error;
+}
+
+function metricsFromStoredEvents(events: StoredMessageEvent[], directory: KommoDirectoryUser[]) {
+  const byConversation = new Map<string, StoredMessageEvent[]>();
+  events.forEach((event) => {
+    const conversationId = eventConversationId(event);
+    byConversation.set(conversationId, [...(byConversation.get(conversationId) ?? []), event]);
+  });
+
+  const allWindows: ReplyWindow[] = [];
+  const openWindows: OpenWindow[] = [];
+  byConversation.forEach((conversationEvents, conversationId) => {
+    const fallbackUserName = conversationEvents.find((event) => event.direction === "outgoing")?.sender_name ?? undefined;
+    const { windows, openWindow } = computeWindows(conversationId, conversationEvents.map(eventToMessage), fallbackUserName);
+    allWindows.push(...windows);
+    if (openWindow) openWindows.push(openWindow);
+  });
+
+  const global = buildGroup("global", "Global", allWindows, openWindows.length);
+  const userMap = new Map<string, { userName: string; userId?: string; teamId?: string; teamName?: string; windows: ReplyWindow[] }>();
+  allWindows.forEach((window) => {
+    const matched = matchDirectoryUser(window, directory);
+    const id = matched?.userId ?? window.userId ?? normalizeName(window.userName) ?? "unknown";
+    const current = userMap.get(id) ?? {
+      userName: matched?.fullName ?? window.userName,
+      userId: matched?.userId ?? window.userId,
+      teamId: matched?.teamId,
+      teamName: matched?.teamName,
+      windows: []
+    };
+    current.windows.push(window);
+    userMap.set(id, current);
+  });
+
+  const byUser = [...userMap.entries()]
+    .map(([id, item]) => buildGroup(id, item.userName, item.windows, 0, item.teamId, item.teamName))
+    .sort((a, b) => b.answeredWindows - a.answeredWindows || a.avgReplySeconds - b.avgReplySeconds);
+
+  const teamMap = new Map<string, { name: string; windows: ReplyWindow[] }>();
+  allWindows.forEach((window) => {
+    const matched = matchDirectoryUser(window, directory);
+    const teamId = matched?.teamId ?? matched?.teamName ?? "sin-equipo";
+    const current = teamMap.get(teamId) ?? { name: matched?.teamName ?? "Sin equipo", windows: [] };
+    current.windows.push(window);
+    teamMap.set(teamId, current);
+  });
+
+  const byTeam = [...teamMap.entries()]
+    .map(([id, item]) => buildGroup(id, item.name, item.windows, 0, id))
+    .sort((a, b) => b.answeredWindows - a.answeredWindows || a.avgReplySeconds - b.avgReplySeconds);
+
+  return {
+    connected: allWindows.length > 0,
+    status: allWindows.length > 0 ? ("Sincronizado" as const) : ("Pendiente de sincronizacion" as const),
+    averageResponseSeconds: global.avgReplySeconds || FALLBACK_SECONDS,
+    averageResponseLabel: global.answeredWindows ? global.avgReplyFormatted : formatDuration(FALLBACK_SECONDS),
+    samples: allWindows.length,
+    lastSyncedAt: new Date().toISOString(),
+    activeDialogs: openWindows.length,
+    global: global.answeredWindows
+      ? global
+      : {
+          ...global,
+          avgReplySeconds: FALLBACK_SECONDS,
+          avgReplyFormatted: formatDuration(FALLBACK_SECONDS)
+        },
+    byTeam,
+    byUser
+  };
+}
+
 export async function loadKommoResponseMetrics(searchParams?: URLSearchParams, directory: KommoDirectoryUser[] = []) {
+  const storedEvents = await loadStoredMessageEvents(searchParams);
+  if (storedEvents.rows.length || storedEvents.tableMissing) {
+    return storedEvents.tableMissing ? fallbackMetrics() : metricsFromStoredEvents(storedEvents.rows, directory);
+  }
+
+  if (process.env.KOMMO_USE_CUSTOM_CHATS?.trim() !== "true") {
+    return fallbackMetrics();
+  }
+
   const scopeId = process.env.KOMMO_SCOPE_ID?.trim() || process.env.KOMMO_CHAT_SCOPE_ID?.trim();
   if (!scopeId) return fallbackMetrics();
 
