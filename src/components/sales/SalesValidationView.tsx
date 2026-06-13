@@ -171,11 +171,11 @@ export function SalesValidationView() {
                 <td>{money(sale.netAmount)}</td>
                 <td><span className="badge">{statusLabel(sale.validationStatus)}</span></td>
                 <td>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="icon-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => changeStatus(sale, "validada")} title="Aprobar venta"><Check size={16} /></button>
-                    <button className="icon-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => changeStatus(sale, "observada")} title="Observar venta"><X size={16} /></button>
-                    <button className="icon-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => setEditingSale(sale)} title="Editar venta"><Pencil size={16} /></button>
-                    <button className="icon-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => setAnnulSale(sale)} title="Anular venta"><Ban size={16} /></button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", minWidth: 270 }}>
+                    <button className="ghost-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => changeStatus(sale, "validada")} title="Aprobar venta"><Check size={15} /> Aprobar</button>
+                    <button className="ghost-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => changeStatus(sale, "observada")} title="Observar venta"><X size={15} /> Observar</button>
+                    <button className="primary-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => setEditingSale(sale)} title="Editar venta"><Pencil size={15} /> Editar</button>
+                    <button className="danger-button" disabled={saving || sale.validationStatus === "anulada"} onClick={() => setAnnulSale(sale)} title="Anular venta"><Ban size={15} /> Anular</button>
                   </div>
                 </td>
               </tr>
