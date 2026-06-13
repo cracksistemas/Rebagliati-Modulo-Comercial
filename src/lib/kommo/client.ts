@@ -42,7 +42,7 @@ async function getKommoBaseUrl() {
   throw new Error("Missing KOMMO_BASE_URL or KOMMO_SUBDOMAIN.");
 }
 
-async function getKommoAccessToken() {
+export async function getKommoAccessToken() {
   const token = process.env.KOMMO_ACCESS_TOKEN?.trim();
   if (!token) {
     const cookieStore = await cookies();
@@ -51,6 +51,37 @@ async function getKommoAccessToken() {
     throw new Error("Missing KOMMO_ACCESS_TOKEN.");
   }
   return token;
+}
+
+export async function kommoChatsRequest<T = unknown>(path: string, options: KommoRequestOptions = {}): Promise<T> {
+  const method = options.method ?? "GET";
+  const baseUrl = (process.env.KOMMO_CHATS_BASE_URL?.trim() || "https://amojo.kommo.com").replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${baseUrl}${normalizedPath}`);
+  options.query?.forEach((value, key) => {
+    if (value !== "") url.searchParams.set(key, value);
+  });
+
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${await getKommoAccessToken()}`,
+      Accept: "application/json",
+      ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
+      ...options.headers
+    },
+    body: method === "GET" || options.body === undefined ? undefined : JSON.stringify(options.body),
+    cache: "no-store"
+  });
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new KommoApiError(response.status, payload);
+  }
+
+  return payload as T;
 }
 
 async function buildUrl(path: string, query?: URLSearchParams) {

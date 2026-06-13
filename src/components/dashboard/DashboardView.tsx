@@ -22,11 +22,44 @@ function rankExecutives(state: CommercialState) {
 
 type KommoResponseMetric = {
   connected: boolean;
-  source: string;
+  status: string;
   averageResponseLabel: string;
   averageResponseSeconds: number;
   samples: number;
+  lastSyncedAt: string;
+  activeDialogs: number;
+  byTeam: Array<{
+    id: string;
+    name: string;
+    avgReplyFormatted: string;
+    answeredWindows: number;
+    unansweredDialogs: number;
+    slaCompliance: number;
+  }>;
+  byUser: Array<{
+    id: string;
+    name: string;
+    teamName?: string;
+    avgReplyFormatted: string;
+    answeredWindows: number;
+    unansweredDialogs: number;
+    slaCompliance: number;
+  }>;
 };
+
+function formatLastSync(value?: string) {
+  if (!value) return "Sin sincronizar";
+  try {
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(value));
+  } catch {
+    return "Sin sincronizar";
+  }
+}
 
 function BattleCard({ leaders, total }: { leaders: Executive[]; total: number }) {
   const [first, second] = leaders;
@@ -65,17 +98,21 @@ export function DashboardView() {
     let mounted = true;
     async function loadKommoMetric() {
       try {
-        const response = await fetch(`/api/kommo/metrics/response-time?ts=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch(`/api/kommo/metrics/response-time?from=2026-06-01&to=2026-06-30&ts=${Date.now()}`, { cache: "no-store" });
         const payload = await response.json();
         if (mounted && payload?.data) setKommoMetric(payload.data);
       } catch {
         if (mounted) {
           setKommoMetric({
             connected: false,
-            source: "fallback",
+            status: "Pendiente de sincronizacion",
             averageResponseLabel: state.avgResponseTime,
             averageResponseSeconds: 462,
-            samples: 0
+            samples: 0,
+            lastSyncedAt: new Date().toISOString(),
+            activeDialogs: 0,
+            byTeam: [],
+            byUser: []
           });
         }
       }
@@ -127,8 +164,9 @@ export function DashboardView() {
           <strong>{kommoMetric?.averageResponseLabel ?? state.avgResponseTime}</strong>
           <span className="badge" style={{ width: "fit-content" }}>
             <Link2 size={14} />
-            {kommoMetric?.connected ? "Kommo conectado" : "Kommo fallback"}
+            {kommoMetric?.connected ? `${kommoMetric.samples} respuestas` : "Pendiente de sincronizacion"}
           </span>
+          <small className="muted">Ultima sync: {formatLastSync(kommoMetric?.lastSyncedAt)}</small>
         </div>
       </section>
 
@@ -186,7 +224,7 @@ export function DashboardView() {
           <p className="eyebrow">Alertas</p>
           <h2>Validacion</h2>
           <p className="badge"><AlertTriangle size={16} /> {metrics.pending} ventas pendientes</p>
-          <p className="badge"><Link2 size={16} /> CRM: {kommoMetric?.source ?? "cargando"}</p>
+          <p className="badge"><Link2 size={16} /> CRM: {kommoMetric?.connected ? "Mensajes sincronizados" : "Pendiente"}</p>
           <p className="badge"><AlertTriangle size={16} /> {incidentSummary.total} incidencias del mes</p>
           <p className="muted">Las ventas pendientes no impactan el ranking oficial hasta validarse.</p>
         </div>
@@ -218,19 +256,43 @@ export function DashboardView() {
           <div className="modal" style={{ width: "min(760px, 94vw)" }}>
             <p className="eyebrow">CRM Kommo</p>
             <h2>Tiempos de respuesta por usuario</h2>
-            <p className="muted">Resumen conectado al endpoint de Kommo. Si el CRM no entrega muestras, se muestra el promedio fallback configurado.</p>
+            <p className="muted">Calculado con mensajes reales: entrante del cliente y primera respuesta saliente posterior. Ultima sync: {formatLastSync(kommoMetric?.lastSyncedAt)}.</p>
             <table className="table">
-              <thead><tr><th>Usuario</th><th>Equipo</th><th>Tiempo promedio</th><th>Muestras</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Usuario</th><th>Equipo</th><th>Tiempo promedio</th><th>Respuestas</th><th>SLA</th></tr></thead>
               <tbody>
-                {ranking.map((executive) => (
-                  <tr key={executive.id}>
-                    <td><strong>{executive.fullName}</strong></td>
-                    <td>{state.teams.find((team) => team.id === executive.teamId)?.name ?? "Sin equipo"}</td>
-                    <td>{kommoMetric?.averageResponseLabel ?? state.avgResponseTime}</td>
-                    <td>{kommoMetric?.samples ?? 0}</td>
-                    <td><span className="badge">{kommoMetric?.connected ? "Conectado" : "Fallback"}</span></td>
+                {(kommoMetric?.byUser.length ? kommoMetric.byUser : []).map((user) => (
+                  <tr key={user.id}>
+                    <td><strong>{user.name}</strong></td>
+                    <td>{user.teamName ?? "Sin equipo"}</td>
+                    <td>{user.avgReplyFormatted}</td>
+                    <td>{user.answeredWindows}</td>
+                    <td>{user.slaCompliance}%</td>
                   </tr>
                 ))}
+                {!kommoMetric?.byUser.length ? (
+                  <tr>
+                    <td colSpan={5} className="muted">Aun no hay mensajes sincronizados por usuario.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+            <h3 style={{ marginTop: 18 }}>Resumen por equipo</h3>
+            <table className="table">
+              <thead><tr><th>Equipo</th><th>Tiempo promedio</th><th>Respuestas</th><th>SLA</th></tr></thead>
+              <tbody>
+                {(kommoMetric?.byTeam.length ? kommoMetric.byTeam : []).map((team) => (
+                  <tr key={team.id}>
+                    <td><strong>{team.name}</strong></td>
+                    <td>{team.avgReplyFormatted}</td>
+                    <td>{team.answeredWindows}</td>
+                    <td>{team.slaCompliance}%</td>
+                  </tr>
+                ))}
+                {!kommoMetric?.byTeam.length ? (
+                  <tr>
+                    <td colSpan={4} className="muted">Aun no hay mensajes sincronizados por equipo.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
