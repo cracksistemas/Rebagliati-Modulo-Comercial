@@ -10,6 +10,7 @@ create table if not exists public.kommo_webhook_debug (
   table_missing boolean not null default false,
   supabase_error jsonb null,
   reason text not null,
+  raw_body text null,
   raw_payload jsonb not null default '{}'::jsonb
 );
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   countKommoWebhookCandidateRecords,
-  formEntriesToObject,
   getSafeTopLevelKeys,
   normalizeKommoWebhookPayload,
+  parseUrlEncodedBody,
   persistKommoMessageEvents,
   persistKommoWebhookDebug
 } from "@/lib/kommo/message-events";
@@ -24,12 +24,30 @@ function getPayloadSecret(payload: unknown) {
   return typeof value === "string" ? value : null;
 }
 
+function parseRawWebhookBody(contentType: string, rawBody: string) {
+  if (!rawBody.trim()) return {};
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(rawBody) as unknown;
+    } catch {
+      return { _parse_error: "invalid_json", _raw_body_preview: rawBody.slice(0, 500) };
+    }
+  }
+  if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+    return parseUrlEncodedBody(rawBody);
+  }
+  try {
+    return JSON.parse(rawBody) as unknown;
+  } catch {
+    return parseUrlEncodedBody(rawBody);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json")
-    ? await request.json()
-    : formEntriesToObject((await request.formData()).entries());
-  const bodyReceived = Boolean(payload && (typeof payload !== "object" || Object.keys(payload as Record<string, unknown>).length > 0));
+  const rawBody = await request.text();
+  const payload = parseRawWebhookBody(contentType, rawBody);
+  const bodyReceived = rawBody.trim().length > 0;
   const topLevelKeys = getSafeTopLevelKeys(payload);
   const detectedRecords = countKommoWebhookCandidateRecords(payload);
 
@@ -47,6 +65,7 @@ export async function POST(request: NextRequest) {
       "Kommo webhook rejected",
       JSON.stringify({
         contentType,
+        rawBodyLength: rawBody.length,
         bodyReceived,
         topLevelKeys,
         detectedRecords,
@@ -68,6 +87,7 @@ export async function POST(request: NextRequest) {
     "Kommo webhook received",
     JSON.stringify({
       contentType,
+      rawBodyLength: rawBody.length,
       bodyReceived,
       topLevelKeys,
       detectedRecords,
@@ -105,6 +125,7 @@ export async function POST(request: NextRequest) {
   if (!events.length || persistence.error || persistence.tableMissing) {
     debugResult = await persistKommoWebhookDebug({
       contentType,
+      rawBody,
       bodyReceived,
       topLevelKeys,
       detectedRecords,
@@ -126,6 +147,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     receivedAt: new Date().toISOString(),
     contentType,
+    rawBodyLength: rawBody.length,
     bodyReceived,
     topLevelKeys,
     detectedRecords,

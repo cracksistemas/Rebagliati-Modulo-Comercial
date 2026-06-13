@@ -28,6 +28,7 @@ export type SupabasePersistenceError = {
 
 type KommoWebhookDebugEntry = {
   contentType: string;
+  rawBody?: string;
   bodyReceived: boolean;
   topLevelKeys: string[];
   detectedRecords: number;
@@ -93,6 +94,15 @@ export function formEntriesToObject(entries: Iterable<[string, FormDataEntryValu
   for (const [key, value] of entries) {
     setNested(target, key, typeof value === "string" ? value : value.name);
   }
+  return target;
+}
+
+export function parseUrlEncodedBody(rawBody: string) {
+  const target: UnknownRecord = {};
+  const params = new URLSearchParams(rawBody);
+  params.forEach((value, key) => {
+    setNested(target, key, value);
+  });
   return target;
 }
 
@@ -282,6 +292,7 @@ export async function persistKommoWebhookDebug(entry: KommoWebhookDebugEntry) {
       table_missing: entry.tableMissing,
       supabase_error: entry.supabaseError ?? null,
       reason: entry.reason,
+      raw_body: entry.rawBody ?? null,
       raw_payload: entry.rawPayload
     });
     if (!error) return { inserted: true, error: null };
