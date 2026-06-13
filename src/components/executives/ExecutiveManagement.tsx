@@ -208,8 +208,8 @@ export function ExecutiveManagement() {
 
       {editing && (
         <div className="modal-backdrop">
-          <div className="modal" style={{ width: "min(760px, 96vw)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+          <div className="modal executive-profile-modal">
+            <div className="executive-profile-header">
               <div>
                 <p className="eyebrow">Perfil comercial</p>
                 <h2>{editing.fullName || "Nuevo ejecutivo"}</h2>
@@ -217,9 +217,9 @@ export function ExecutiveManagement() {
               <button className="ghost-button" onClick={() => setEditing(null)}>Cerrar</button>
             </div>
 
-            <div className="grid grid-2" style={{ marginTop: 16, alignItems: "start" }}>
-              <div className="card" style={{ boxShadow: "none" }}>
-                <div style={{ width: 220, height: 220, borderRadius: 22, overflow: "hidden", background: "#fff", border: "1px solid #E5E5EA", margin: "0 auto 14px", display: "grid", placeItems: "center", position: "relative" }}>
+            <div className="executive-profile-layout">
+              <div className="executive-photo-panel">
+                <div className="executive-photo-preview">
                   {photoPreview ? (
                     <img
                       src={photoPreview}
@@ -237,14 +237,7 @@ export function ExecutiveManagement() {
                   )}
                   <div
                     aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      inset: 18,
-                      borderRadius: "50%",
-                      border: "2px solid rgba(0, 167, 235, 0.85)",
-                      boxShadow: "0 0 0 999px rgba(245,245,247,0.5)",
-                      pointerEvents: "none"
-                    }}
+                    className="executive-photo-mask"
                   />
                 </div>
                 <label className="primary-button" style={{ width: "100%" }}>
@@ -266,7 +259,7 @@ export function ExecutiveManagement() {
                 </div>
               </div>
 
-              <div className="form-grid">
+              <div className="executive-fields-grid">
                 <div className="field">
                   <label>Correo asignado</label>
                   <input type="email" value={editing.email ?? ""} onChange={(event) => setEditing({ ...editing, email: event.target.value })} placeholder="ejecutivo@rebagliati.com" />
@@ -326,7 +319,7 @@ export function ExecutiveManagement() {
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+            <div className="executive-profile-actions">
               <button className="ghost-button" onClick={() => setEditing(null)}>Cancelar</button>
               <button className="primary-button" onClick={saveExecutive}>Guardar cambios</button>
             </div>

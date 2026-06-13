@@ -509,6 +509,86 @@ img.avatar {
   gap: 14px;
 }
 
+.executive-profile-modal {
+  width: min(1040px, calc(100vw - 48px));
+  overflow-x: hidden;
+}
+
+.executive-profile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.executive-profile-header h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.25rem, 1.8vw, 1.65rem);
+}
+
+.executive-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.executive-photo-panel {
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 18px;
+  background: #fbfbfd;
+}
+
+.executive-photo-preview {
+  width: min(240px, 100%);
+  aspect-ratio: 1;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.executive-photo-mask {
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 167, 235, 0.85);
+  box-shadow: 0 0 0 999px rgba(245, 245, 247, 0.5);
+  pointer-events: none;
+}
+
+.executive-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.executive-fields-grid .field:first-child,
+.executive-fields-grid .field:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.executive-fields-grid .field input,
+.executive-fields-grid .field select {
+  width: 100%;
+  min-width: 0;
+}
+
+.executive-profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -686,6 +766,20 @@ img.avatar {
 
   .client-map-orbit {
     grid-template-columns: 1fr;
+  }
+
+  .executive-profile-modal {
+    width: min(720px, calc(100vw - 28px));
+  }
+
+  .executive-profile-layout,
+  .executive-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-fields-grid .field:first-child,
+  .executive-fields-grid .field:nth-child(3) {
+    grid-column: auto;
   }
 }
 
