@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import { getServerSupabaseUrl } from "@/lib/supabase/env";
 
 export function getAdminSupabaseProjectRef() {
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getServerSupabaseUrl();
   if (!supabaseUrl) return "missing-url";
   try {
     return new URL(supabaseUrl).hostname.split(".")[0] || "unknown-ref";
@@ -11,7 +12,7 @@ export function getAdminSupabaseProjectRef() {
 }
 
 export function createAdminClient() {
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getServerSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
