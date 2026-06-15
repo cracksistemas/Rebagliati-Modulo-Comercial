@@ -43,6 +43,30 @@ function roleLabel(role = "ejecutivo") {
   return labels[normalized] ?? "Ejecutivo";
 }
 
+function codePrefixForRole(role = "Ejecutivo") {
+  const normalized = role.toLowerCase();
+  if (normalized.includes("super")) return "SA";
+  if (normalized.includes("admin")) return "AD";
+  if (normalized.includes("gerencia")) return "GE";
+  if (normalized.includes("jefe")) return "JV";
+  if (normalized.includes("lider")) return "LV";
+  if (normalized.includes("supervisor")) return "SU";
+  if (normalized.includes("marketing")) return "MK";
+  return "E";
+}
+
+async function generateExecutiveCode(admin: ReturnType<typeof createAdminClient>, role = "Ejecutivo", currentId = "") {
+  const prefix = codePrefixForRole(role);
+  const { data, error } = await admin.from("executives").select("id,code");
+  if (error) throw error;
+  const max = ((data as { id: string; code: string | null }[] | null) ?? []).reduce((highest, item) => {
+    if (item.id === currentId) return highest;
+    const match = String(item.code ?? "").match(new RegExp(`^${prefix}-(\\d+)$`, "i"));
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
+}
+
 function parseDataUrl(dataUrl?: string) {
   if (!dataUrl?.startsWith("data:")) return null;
   const [metadata, base64] = dataUrl.split(",");
@@ -107,6 +131,7 @@ export async function POST(request: NextRequest) {
     if (!payload.id || !payload.fullName?.trim()) throw new Error("El ejecutivo necesita nombre.");
 
     const admin = createAdminClient();
+    const generatedCode = payload.code?.trim() || await generateExecutiveCode(admin, payload.role, payload.id);
     let photoPath = extractPhotoPath(payload.photoUrl);
     const parsedPhoto = parseDataUrl(payload.photoDataUrl);
     if (parsedPhoto) {
@@ -164,7 +189,7 @@ export async function POST(request: NextRequest) {
     const { error: executiveError } = await admin.from("executives").upsert({
       id: payload.id,
       profile_id: profileId ?? existing?.profile_id ?? null,
-      code: payload.code ?? "",
+      code: generatedCode,
       full_name: payload.fullName.trim(),
       photo_url: photoPath,
       shift: payload.shift ?? "Manana",
@@ -207,7 +232,7 @@ export async function POST(request: NextRequest) {
       data: {
         id: payload.id,
         fullName: payload.fullName,
-        code: payload.code ?? "",
+        code: generatedCode,
         teamId: payload.teamId ?? "",
         shift: payload.shift ?? "Manana",
         status: payload.status ?? "Activo",
@@ -219,6 +244,46 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo guardar el ejecutivo.";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const guard = await requireUser();
+  if (!guard.ok) return guard.response;
+
+  try {
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) return NextResponse.json({ ok: false, error: "Ejecutivo no encontrado." }, { status: 400 });
+
+    const admin = createAdminClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: executive, error: findError } = await admin.from("executives").select("profile_id,full_name").eq("id", id).maybeSingle();
+    if (findError) throw findError;
+    if (!executive) return NextResponse.json({ ok: false, error: "El ejecutivo no existe." }, { status: 404 });
+
+    const { error: executiveError } = await admin.from("executives").update({ status: "Baja" }).eq("id", id);
+    if (executiveError) throw executiveError;
+
+    const { error: memberError } = await admin.from("team_members").update({ active: false, end_date: today }).eq("executive_id", id).eq("active", true);
+    if (memberError) throw memberError;
+
+    if (executive.profile_id) {
+      await admin.from("profiles").update({ active: false }).eq("id", executive.profile_id);
+    }
+
+    await admin.from("audit_logs").insert({
+      table_name: "executives",
+      record_id: id,
+      action: "executive_deactivated",
+      old_data: { status: "Activo", full_name: executive.full_name },
+      new_data: { status: "Baja" },
+      user_id: guard.userId
+    }).then(() => undefined);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo dar de baja al ejecutivo.";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

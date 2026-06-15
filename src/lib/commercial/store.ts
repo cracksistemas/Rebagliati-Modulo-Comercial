@@ -88,13 +88,16 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
 
   const sales: Sale[] = asArray<Sale>(source.sales, seedState.sales).map((sale, index) => {
     const seedSale = seedState.sales[index] ?? seedState.sales[0] ?? defaultSale;
-    const productType: Sale["productType"] =
-      sale.productType === "Curso Modular" || sale.productType === "Diplomado" ? sale.productType : "Curso";
+    const productType: Sale["productType"] = asString(sale.productType, seedSale.productType);
     const validationStatus: Sale["validationStatus"] =
       sale.validationStatus === "registrada" ||
       sale.validationStatus === "validada" ||
       sale.validationStatus === "observada" ||
-      sale.validationStatus === "anulada"
+      sale.validationStatus === "rechazada" ||
+      sale.validationStatus === "anulada" ||
+      sale.validationStatus === "pago_parcial" ||
+      sale.validationStatus === "saldo_pendiente" ||
+      sale.validationStatus === "completada"
         ? sale.validationStatus
         : "pendiente_validacion";
     return {
@@ -104,14 +107,45 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
       teamId: asString(sale.teamId, seedSale.teamId),
       productType,
       productName: asString(sale.productName, seedSale.productName),
+      programCode: typeof sale.programCode === "string" ? sale.programCode : undefined,
+      modality: asString(sale.modality, seedSale.modality ?? "Virtual"),
+      startDate: typeof sale.startDate === "string" ? sale.startDate : undefined,
+      endDate: typeof sale.endDate === "string" ? sale.endDate : undefined,
+      duration: typeof sale.duration === "string" ? sale.duration : undefined,
+      schedule: typeof sale.schedule === "string" ? sale.schedule : undefined,
+      certification: typeof sale.certification === "string" ? sale.certification : undefined,
+      certifyingInstitution: typeof sale.certifyingInstitution === "string" ? sale.certifyingInstitution : undefined,
+      commercialStatus: asString(sale.commercialStatus, seedSale.commercialStatus ?? "Pendiente de validación"),
+      attentionChannel: asString(sale.attentionChannel, seedSale.attentionChannel ?? "WhatsApp"),
       quantity: asNumber(sale.quantity, seedSale.quantity),
       grossAmount: asNumber(sale.grossAmount, seedSale.grossAmount),
       discountAmount: asNumber(sale.discountAmount, seedSale.discountAmount),
       netAmount: asNumber(sale.netAmount, seedSale.netAmount),
+      paidAmount: asNumber(sale.paidAmount, sale.netAmount ?? seedSale.netAmount),
+      pendingAmount: asNumber(sale.pendingAmount, 0),
+      billingType: asString(sale.billingType, seedSale.billingType ?? "Pago único"),
+      paymentPlanType: asString(sale.paymentPlanType, seedSale.paymentPlanType ?? "Pago completo"),
+      paymentConcept: asString(sale.paymentConcept, seedSale.paymentConcept ?? "Pago total"),
+      paymentEntity: typeof sale.paymentEntity === "string" ? sale.paymentEntity : undefined,
+      destinationHolder: typeof sale.destinationHolder === "string" ? sale.destinationHolder : undefined,
+      operationNumber: typeof sale.operationNumber === "string" ? sale.operationNumber : undefined,
+      operationDate: typeof sale.operationDate === "string" ? sale.operationDate : undefined,
+      operationTime: typeof sale.operationTime === "string" ? sale.operationTime : undefined,
+      paymentStatus: asString(sale.paymentStatus, seedSale.paymentStatus ?? "Pendiente de validación"),
       leadSource: asString(sale.leadSource, seedSale.leadSource),
       paymentMethod: asString(sale.paymentMethod, seedSale.paymentMethod),
       validationStatus,
-      notes: typeof sale.notes === "string" ? sale.notes : undefined
+      notes: typeof sale.notes === "string" ? sale.notes : undefined,
+      participant: sale.participant ?? seedSale.participant,
+      payment: sale.payment ?? seedSale.payment,
+      paymentPlan: sale.paymentPlan ?? seedSale.paymentPlan,
+      attachments: asArray(sale.attachments, seedSale.attachments ?? []).map((attachment) => ({
+        ...attachment,
+        dataUrl: attachment.dataUrl?.startsWith("blob:") ? undefined : attachment.dataUrl
+      })),
+      validationChecklist: sale.validationChecklist ?? seedSale.validationChecklist,
+      followups: asArray(sale.followups, seedSale.followups ?? []),
+      modalityDetails: sale.modalityDetails ?? seedSale.modalityDetails
     };
   });
 
@@ -176,6 +210,13 @@ export function setCommercialState(next: CommercialState) {
     executives: next.executives.map((item) => ({
       ...item,
       photoUrl: item.photoUrl?.startsWith("blob:") ? undefined : item.photoUrl
+    })),
+    sales: next.sales.map((sale) => ({
+      ...sale,
+      attachments: sale.attachments?.map((attachment) => ({
+        ...attachment,
+        dataUrl: attachment.dataUrl?.startsWith("blob:") ? undefined : attachment.dataUrl
+      }))
     }))
   };
   try {

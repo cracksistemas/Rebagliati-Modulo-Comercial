@@ -57,12 +57,16 @@
   color: var(--warning);
 }
 
-.status-observada {
+.status-observada,
+.status-rechazada {
   background: rgba(255, 59, 48, 0.1);
   color: var(--danger);
 }
 
-.status-anulada {
+.status-anulada,
+.status-pago_parcial,
+.status-saldo_pendiente,
+.status-completada {
   background: rgba(142, 142, 147, 0.14);
   color: var(--text-muted);
 }
@@ -82,6 +86,88 @@
 
 .sales-validation-card {
   padding: 22px;
+}
+
+.sales-entry-card {
+  display: grid;
+  gap: 18px;
+}
+
+.sales-entry-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sales-entry-header h2 {
+  margin-bottom: 4px;
+}
+
+.sales-entry-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.sales-form-section {
+  border: 1px solid rgba(229, 229, 234, 0.78);
+  border-radius: 20px;
+  padding: clamp(14px, 1.4vw, 18px);
+  background: rgba(250, 250, 252, 0.7);
+}
+
+.sales-form-section h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+}
+
+.field-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+}
+
+.sales-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 149, 0, 0.12);
+  color: #8a5200;
+  font-weight: 800;
+}
+
+.sales-upload-zone {
+  min-height: 42px;
+  padding-inline: 14px;
+  cursor: pointer;
+}
+
+.sales-evidence-list {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inline-x {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(29, 29, 31, 0.08);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sales-entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .sales-validation-header,
@@ -129,10 +215,17 @@
 }
 
 .sales-row-actions {
-  display: flex;
-  min-width: 360px;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.sales-row-actions .icon-button {
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
 }
 
 .ghost-button,
@@ -258,6 +351,22 @@
   color: var(--danger);
   font-size: 0.76rem;
   font-weight: 800;
+}
+
+@media (max-width: 920px) {
+  .form-grid,
+  .sales-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .span-2,
+  .sales-span-all {
+    grid-column: auto;
+  }
+
+  .sales-validation-table {
+    min-width: 860px;
+  }
 }
 
 .sales-net-preview {

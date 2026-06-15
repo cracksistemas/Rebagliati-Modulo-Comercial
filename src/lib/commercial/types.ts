@@ -1,5 +1,69 @@
-export type ProductType = "Curso" | "Curso Modular" | "Diplomado";
-export type SaleStatus = "registrada" | "pendiente_validacion" | "validada" | "observada" | "anulada";
+export type ProductType = "Curso" | "Curso Modular" | "Diplomado" | "Taller" | "Seminario" | "Certifícate" | "Asincrónico" | "Otro" | string;
+export type SaleStatus = "registrada" | "pendiente_validacion" | "validada" | "observada" | "rechazada" | "anulada" | "pago_parcial" | "saldo_pendiente" | "completada";
+
+export type SaleParticipant = {
+  fullName: string;
+  documentType: "DNI" | "Carnet de extranjería" | "Pasaporte" | "RUC" | "Otro" | string;
+  documentNumber: string;
+  phone: string;
+  email: string;
+  country?: string;
+  department: string;
+  province: string;
+  district: string;
+  workplace?: string;
+  academicDegree?: string;
+  profession?: string;
+  licenseNumber?: string;
+  address?: string;
+  notes?: string;
+};
+
+export type SalePayment = {
+  paymentDate: string;
+  paymentTime?: string;
+  concept: string;
+  method: string;
+  entity?: string;
+  destinationHolder?: string;
+  operationNumber?: string;
+  expectedAmount: number;
+  paidAmount: number;
+  status: "Pendiente de validación" | "Validado" | "Observado" | "Rechazado" | "Duplicado" | "No coincide monto" | "No coincide titular" | "No legible" | string;
+};
+
+export type SalePaymentPlan = {
+  planType: string;
+  billingType: string;
+  enrollmentAmount?: number;
+  monthlyAmount?: number;
+  monthlyCount?: number;
+  certificateAmount?: number;
+  totalProgramAmount?: number;
+  paidAmount?: number;
+  pendingAmount?: number;
+  nextDueDate?: string;
+  nextDueAmount?: number;
+};
+
+export type SaleAttachmentDraft = {
+  id: string;
+  attachmentType: string;
+  fileName: string;
+  description?: string;
+  dataUrl?: string;
+};
+
+export type SaleValidationChecklist = {
+  receiptLegible: boolean;
+  amountMatches: boolean;
+  operationNotDuplicated: boolean;
+  participantComplete: boolean;
+  programMatches: boolean;
+  modalityCorrect: boolean;
+  paymentConceptClear: boolean;
+  discountAuthorized: boolean;
+};
 
 export type Executive = {
   id: string;
@@ -31,14 +95,42 @@ export type Sale = {
   teamId?: string;
   productType: ProductType;
   productName: string;
+  programCode?: string;
+  modality?: string;
+  startDate?: string;
+  endDate?: string;
+  duration?: string;
+  schedule?: string;
+  certification?: string;
+  certifyingInstitution?: string;
+  commercialStatus?: string;
+  attentionChannel?: string;
   quantity: number;
   grossAmount: number;
   discountAmount: number;
   netAmount: number;
+  paidAmount?: number;
+  pendingAmount?: number;
+  billingType?: string;
+  paymentPlanType?: string;
+  paymentConcept?: string;
+  paymentEntity?: string;
+  destinationHolder?: string;
+  operationNumber?: string;
+  operationDate?: string;
+  operationTime?: string;
+  paymentStatus?: string;
   leadSource: string;
   paymentMethod: string;
   validationStatus: SaleStatus;
   notes?: string;
+  participant?: Partial<SaleParticipant>;
+  payment?: Partial<SalePayment>;
+  paymentPlan?: Partial<SalePaymentPlan>;
+  attachments?: SaleAttachmentDraft[];
+  validationChecklist?: Partial<SaleValidationChecklist>;
+  followups?: string[];
+  modalityDetails?: Record<string, string | number | boolean | undefined>;
 };
 
 export type UserProfile = {

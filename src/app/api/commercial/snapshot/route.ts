@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function productTypeName(code?: string) {
+function productTypeName(code?: string, name?: string) {
+  if (name) return name;
   if (code === "CM") return "Curso Modular";
   if (code === "D") return "Diplomado";
   return "Curso";
@@ -16,6 +17,22 @@ function normalizeStatus(status?: string) {
   if (value.includes("baja")) return "Baja";
   if (value.includes("inactivo")) return "Inactivo";
   return "Activo";
+}
+
+function parseExtendedSalePayload(notes?: string | null) {
+  if (!notes?.includes("__reba_sale_payload__")) return {};
+  const raw = notes.split("__reba_sale_payload__").at(-1)?.trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function cleanSaleNotes(notes?: string | null) {
+  if (!notes) return undefined;
+  return notes.split("__reba_sale_payload__")[0]?.trim() || undefined;
 }
 
 async function signedExecutivePhoto(admin: ReturnType<typeof createAdminClient>, value?: string | null) {
@@ -56,27 +73,45 @@ export async function GET() {
     const teamByExecutive = new Map(memberships.map((item) => [item.executive_id, item.team_id]));
     const sales = ((salesResult.data as any[]) ?? []).map((sale) => {
       const typeCode = sale.product_types?.code ?? "C";
+      const extended = parseExtendedSalePayload(sale.notes);
       return {
         id: sale.id,
         saleDate: sale.sale_date,
         executiveId: sale.executive_id,
         teamId: sale.team_id,
-        productType: productTypeName(typeCode),
+        productType: productTypeName(typeCode, sale.product_types?.name),
         productName: sale.products?.name ?? sale.notes ?? "Carga historica ranking Junio 2026",
+        modality: extended.modality ?? sale.products?.modality,
+        attentionChannel: extended.attentionChannel,
         quantity: Number(sale.quantity ?? 0),
         grossAmount: Number(sale.gross_amount ?? 0),
         discountAmount: Number(sale.discount_amount ?? 0),
         netAmount: Number(sale.net_amount ?? 0),
+        paidAmount: Number(extended.paidAmount ?? sale.net_amount ?? 0),
+        pendingAmount: Number(extended.pendingAmount ?? 0),
+        paymentPlanType: extended.paymentPlanType,
+        billingType: extended.billingType,
+        paymentConcept: extended.paymentConcept,
+        paymentEntity: extended.paymentEntity,
+        destinationHolder: extended.destinationHolder,
+        operationNumber: extended.operationNumber,
+        operationDate: extended.operationDate,
+        operationTime: extended.operationTime,
+        paymentStatus: extended.paymentStatus,
+        participant: extended.participant,
+        paymentPlan: extended.paymentPlan,
+        modalityDetails: extended.modalityDetails,
+        attachments: extended.attachments,
         paymentMethod: sale.payment_method ?? "No especificado",
         leadSource: sale.lead_source ?? "Importacion",
         validationStatus: sale.validation_status ?? "pendiente_validacion",
-        notes: sale.notes ?? undefined,
+        notes: cleanSaleNotes(sale.notes),
         pointWeight: Number(sale.product_types?.point_weight ?? 1)
       };
     });
 
     const validSales = sales.filter((sale) => sale.validationStatus === "validada");
-    const executives = await Promise.all(((executivesResult.data as any[]) ?? []).map(async (executive) => {
+    const executives = await Promise.all(((executivesResult.data as any[]) ?? []).filter((executive) => normalizeStatus(executive.status) !== "Baja").map(async (executive) => {
       const ownSales = validSales.filter((sale) => sale.executiveId === executive.id);
       return {
         id: executive.id,

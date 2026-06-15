@@ -478,6 +478,121 @@ img.avatar {
   background: #fbfbfd;
 }
 
+.page-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.academy-hero,
+.academy-layout,
+.academy-actions,
+.academy-section-title,
+.academy-content-row,
+.academy-team-row {
+  display: flex;
+  gap: 16px;
+}
+
+.academy-hero,
+.academy-section-title {
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.academy-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.academy-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.academy-panel {
+  padding: clamp(16px, 1.7vw, 22px);
+}
+
+.academy-path-list,
+.academy-content-list,
+.academy-team-list,
+.academy-module-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.academy-path {
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 13px;
+  background: #fafafd;
+  text-align: left;
+  display: grid;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.academy-path.active {
+  border-color: rgba(0, 167, 235, 0.48);
+  background: #eaf8ff;
+  color: var(--reba-primary);
+}
+
+.academy-path span,
+.academy-content-row strong,
+.academy-team-row strong {
+  font-weight: 900;
+}
+
+.academy-path small,
+.academy-content-row small {
+  color: var(--text-muted);
+}
+
+.academy-progress,
+.academy-team-row span {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ececf0;
+}
+
+.academy-progress span,
+.academy-team-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--reba-accent);
+}
+
+.academy-module {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: #f5f5f7;
+  font-weight: 800;
+}
+
+.academy-content-row,
+.academy-team-row {
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 10px 0;
+}
+
+.academy-content-row > div,
+.academy-team-row > div {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
 .legacy-settings-summary {
   display: none;
 }
@@ -773,7 +888,8 @@ img.avatar {
   }
 
   .executive-profile-layout,
-  .executive-fields-grid {
+  .executive-fields-grid,
+  .academy-layout {
     grid-template-columns: 1fr;
   }
 
@@ -818,6 +934,17 @@ img.avatar {
     min-height: 38px;
     padding-inline: 12px;
     font-size: 0.9rem;
+  }
+
+  .academy-actions,
+  .sales-entry-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .academy-actions > *,
+  .sales-entry-actions > * {
+    flex: 1 1 auto;
   }
 
   .card {

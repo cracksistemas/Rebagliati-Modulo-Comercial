@@ -38,8 +38,8 @@ interface DbGoal {
 
 interface DbProductType {
   id: string;
-  code: "C" | "CM" | "D";
-  name: "Curso" | "Curso Modular" | "Diplomado";
+  code: "C" | "CM" | "D" | string;
+  name: "Curso" | "Curso Modular" | "Diplomado" | string;
   point_weight: number;
   active: boolean;
 }
@@ -65,7 +65,7 @@ interface DbSale {
   discount_amount: number;
   net_amount: number;
   payment_method: string;
-  lead_source: "Meta Ads" | "WhatsApp" | "Base" | "Referido" | "Organico" | "Otro";
+  lead_source: "Meta Ads" | "WhatsApp" | "Base" | "Referido" | "Organico" | "Otro" | string;
   validation_status: "registrada" | "pendiente_validacion" | "validada" | "observada" | "anulada";
   notes: string | null;
 }
@@ -283,22 +283,47 @@ export async function loadCommercialSales(): Promise<Sale[]> {
 
   if (error) throw error;
 
-  return ((data as DbSale[] | null) ?? []).map((sale) => ({
-    id: sale.id,
-    saleDate: sale.sale_date,
-    executiveId: sale.executive_id,
-    teamId: sale.team_id,
-    productTypeId: sale.product_type_id,
-    productId: sale.product_id ?? "",
-    quantity: Number(sale.quantity),
-    grossAmount: Number(sale.gross_amount),
-    discountAmount: Number(sale.discount_amount),
-    netAmount: Number(sale.net_amount),
-    paymentMethod: sale.payment_method,
-    leadSource: sale.lead_source,
-    validationStatus: sale.validation_status,
-    notes: sale.notes ?? undefined
-  }));
+  return ((data as DbSale[] | null) ?? []).map((sale) => {
+    const extended = parseExtendedSalePayload(sale.notes);
+    return {
+      id: sale.id,
+      saleDate: sale.sale_date,
+      executiveId: sale.executive_id,
+      teamId: sale.team_id,
+      productTypeId: sale.product_type_id,
+      productId: sale.product_id ?? "",
+      quantity: Number(sale.quantity),
+      grossAmount: Number(sale.gross_amount),
+      discountAmount: Number(sale.discount_amount),
+      netAmount: Number(sale.net_amount),
+      paidAmount: Number(extended.paidAmount ?? sale.net_amount ?? 0),
+      pendingAmount: Number(extended.pendingAmount ?? 0),
+      modality: typeof extended.modality === "string" ? extended.modality : undefined,
+      attentionChannel: typeof extended.attentionChannel === "string" ? extended.attentionChannel : undefined,
+      paymentConcept: typeof extended.paymentConcept === "string" ? extended.paymentConcept : undefined,
+      billingType: typeof extended.billingType === "string" ? extended.billingType : undefined,
+      paymentMethod: sale.payment_method,
+      leadSource: sale.lead_source,
+      validationStatus: sale.validation_status,
+      notes: cleanSaleNotes(sale.notes)
+    };
+  });
+}
+
+function parseExtendedSalePayload(notes?: string | null) {
+  if (!notes?.includes("__reba_sale_payload__")) return {} as Record<string, unknown>;
+  const raw = notes.split("__reba_sale_payload__").at(-1)?.trim();
+  if (!raw) return {} as Record<string, unknown>;
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {} as Record<string, unknown>;
+  }
+}
+
+function cleanSaleNotes(notes?: string | null) {
+  if (!notes) return undefined;
+  return notes.split("__reba_sale_payload__")[0]?.trim() || undefined;
 }
 
 export async function saveCommercialSale(sale: Sale) {

@@ -7,8 +7,8 @@ import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
 import type { ProductType, Sale, SaleStatus } from "@/lib/commercial/types";
 
-const productTypes: ProductType[] = ["Curso", "Curso Modular", "Diplomado"];
-const statusOptions: SaleStatus[] = ["registrada", "pendiente_validacion", "validada", "observada", "anulada"];
+const productTypes: ProductType[] = ["Curso", "Curso Modular", "Diplomado", "Taller", "Seminario", "Certifícate", "Asincrónico", "Otro"];
+const statusOptions: SaleStatus[] = ["registrada", "pendiente_validacion", "validada", "observada", "rechazada", "anulada", "pago_parcial", "saldo_pendiente", "completada"];
 const annulReasonOptions = [
   "Duplicada",
   "Error en monto",
@@ -32,7 +32,11 @@ function statusLabel(status: SaleStatus) {
     pendiente_validacion: "Pendiente",
     validada: "Validada",
     observada: "Observada",
-    anulada: "Anulada"
+    rechazada: "Rechazada",
+    anulada: "Anulada",
+    pago_parcial: "Pago parcial",
+    saldo_pendiente: "Saldo pendiente",
+    completada: "Completada"
   };
   return labels[status] ?? status;
 }
@@ -375,10 +379,10 @@ function SaleRowActions({
   const isAnnulled = sale.validationStatus === "anulada";
   return (
     <div className="sales-row-actions">
-      <button className="ghost-button" disabled={saving || isAnnulled} onClick={onApprove} title="Aprobar venta"><Check size={15} /> Aprobar</button>
-      <button className="ghost-button" disabled={saving || isAnnulled} onClick={onObserve} title="Observar venta"><X size={15} /> Observar</button>
-      <button className="primary-button" disabled={saving || isAnnulled} onClick={onEdit} title="Editar venta"><Pencil size={15} /> Editar</button>
-      <button className="danger-button" disabled={saving || isAnnulled} onClick={onAnnul} title="Anular venta"><Ban size={15} /> Anular</button>
+      <button className="icon-button" disabled={saving || isAnnulled} onClick={onApprove} title="Aprobar venta" aria-label="Aprobar venta"><Check size={15} /></button>
+      <button className="icon-button" disabled={saving || isAnnulled} onClick={onObserve} title="Observar venta" aria-label="Observar venta"><X size={15} /></button>
+      <button className="icon-button" disabled={saving || isAnnulled} onClick={onEdit} title="Editar venta" aria-label="Editar venta"><Pencil size={15} /></button>
+      <button className="icon-button" disabled={saving || isAnnulled} onClick={onAnnul} title="Anular venta" aria-label="Anular venta"><Ban size={15} /></button>
     </div>
   );
 }

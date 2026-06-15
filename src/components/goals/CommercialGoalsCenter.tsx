@@ -374,7 +374,7 @@ function buildGoalMetrics(data: LinkedCommercialData | null, month: string, fall
   const sales = getValidSalesForMonth(data?.sales ?? [], month);
   const validSalesCount = sales.length;
   const salesByDate = sumSalesByDate(sales);
-  const accumulated = sales.reduce((sum, sale) => sum + sale.netAmount, 0);
+  const accumulated = sales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
   const totalWeight = days.reduce((sum, day) => sum + getDayWeight(day), 0) || 1;
 
   let expectedAccumulated = 0;
@@ -606,9 +606,14 @@ function getValidSalesForMonth(sales: Sale[], month: string) {
 
 function sumSalesByDate(sales: Sale[]) {
   return sales.reduce<Record<string, number>>((acc, sale) => {
-    acc[sale.saleDate] = (acc[sale.saleDate] ?? 0) + sale.netAmount;
+    acc[sale.saleDate] = (acc[sale.saleDate] ?? 0) + saleAmountForGoal(sale);
     return acc;
   }, {});
+}
+
+function saleAmountForGoal(sale: Sale) {
+  const paidAmount = Number((sale as Sale & { paidAmount?: number }).paidAmount ?? 0);
+  return paidAmount > 0 ? paidAmount : Number(sale.netAmount ?? 0);
 }
 
 function buildWeeklyPlan(dailyPlan: DailyPlan[]): WeeklyPlan[] {
@@ -719,7 +724,7 @@ function buildRecommendations(input: { goalAmount: number; gap: number; required
 function buildTeamRanking(data: LinkedCommercialData | null, sales: Sale[], goalAmount: number) {
   if (!data) return [];
   return data.teams.map((team) => {
-    const actual = sales.filter((sale) => sale.teamId === team.id).reduce((sum, sale) => sum + sale.netAmount, 0);
+    const actual = sales.filter((sale) => sale.teamId === team.id).reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
     const goal = team.monthlyGoal || goalAmount / Math.max(data.teams.length, 1);
     const progress = goal ? (actual / goal) * 100 : 0;
     return { name: team.name, goal, actual, progress, gap: actual - goal, status: getStatusFromRatio(actual, goal) };
@@ -729,7 +734,7 @@ function buildTeamRanking(data: LinkedCommercialData | null, sales: Sale[], goal
 function buildExecutiveRanking(data: LinkedCommercialData | null, sales: Sale[], goalAmount: number) {
   if (!data) return [];
   return data.executives.map((executive) => {
-    const actual = sales.filter((sale) => sale.executiveId === executive.id).reduce((sum, sale) => sum + sale.netAmount, 0);
+    const actual = sales.filter((sale) => sale.executiveId === executive.id).reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
     const executiveGoal = (executive as { goalAmount?: number }).goalAmount ?? 0;
     const goal = executiveGoal || goalAmount / Math.max(data.executives.length, 1);
     const progress = goal ? (actual / goal) * 100 : 0;

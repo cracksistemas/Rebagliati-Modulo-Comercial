@@ -23,11 +23,37 @@ import {
 
 export function LinkedDashboard() {
   const [data, setData] = useState<LinkedCommercialData | null>(null);
+  const [kommoMetric, setKommoMetric] = useState<{ label: string; status?: string; lastSyncedAt?: string } | null>(null);
 
   useEffect(() => {
     const refresh = () => loadLinkedCommercialData().then(setData);
     refresh();
     return subscribeCommercialDataChange(refresh);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    async function refreshKommo() {
+      try {
+        const response = await fetch("/api/kommo/metrics/response-time", { cache: "no-store" });
+        const payload = (await response.json()) as { ok?: boolean; data?: { averageResponseLabel?: string; status?: string; lastSyncedAt?: string } };
+        if (!alive || !response.ok || !payload.ok || !payload.data?.averageResponseLabel) return;
+        setKommoMetric({
+          label: payload.data.averageResponseLabel,
+          status: payload.data.status,
+          lastSyncedAt: payload.data.lastSyncedAt
+        });
+        window.localStorage.setItem("reba-average-response-time", payload.data.averageResponseLabel);
+      } catch {
+        undefined;
+      }
+    }
+    refreshKommo();
+    const interval = window.setInterval(refreshKommo, 5 * 60 * 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   if (!data) {
@@ -40,7 +66,7 @@ export function LinkedDashboard() {
   const dailyTrend = getDailyAccumulatedFromData(data);
   const lastTrend = dailyTrend.at(-1);
   const pendingCount = getPendingValidationCountFromData(data);
-  const responseTime = getAverageResponseTimeLabel(data);
+  const responseTime = kommoMetric?.label ?? getAverageResponseTimeLabel(data);
 
   return (
     <>
@@ -48,7 +74,12 @@ export function LinkedDashboard() {
         <KpiCard label="Meta mensual" value={currency(progress.goalAmount)} helper="Objetivo comercial del mes" icon={<Target size={22} />} />
         <KpiCard label="Acumulado" value={currency(progress.accumulated)} helper="Solo ventas validadas" icon={<Banknote size={22} />} />
         <KpiCard label="Avance" value={`${progress.progressPct.toFixed(2)}%`} helper={`Brecha ${currency(progress.gap)}`} icon={<TrendingUp size={22} />} />
-        <KpiCard label="Tiempo respuesta" value={responseTime} helper="Promedio comercial objetivo" icon={<Clock3 size={22} />} />
+        <KpiCard
+          label="Tiempo respuesta"
+          value={responseTime}
+          helper={kommoMetric?.lastSyncedAt ? `Kommo · ${new Date(kommoMetric.lastSyncedAt).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}` : "Promedio comercial objetivo"}
+          icon={<Clock3 size={22} />}
+        />
       </section>
 
       <RankingTable items={ranking.slice(0, 8)} />

@@ -15,7 +15,7 @@ export type SaleStatus =
   | "observada"
   | "anulada";
 
-export type LeadSource = "Meta Ads" | "WhatsApp" | "Base" | "Referido" | "Organico" | "Otro";
+export type LeadSource = "Meta Ads" | "WhatsApp" | "Base" | "Referido" | "Organico" | "Otro" | string;
 
 export interface Executive {
   id: string;
@@ -39,8 +39,8 @@ export interface Team {
 
 export interface ProductType {
   id: string;
-  code: ProductTypeCode;
-  name: "Curso" | "Curso Modular" | "Diplomado";
+  code: ProductTypeCode | string;
+  name: "Curso" | "Curso Modular" | "Diplomado" | string;
   pointWeight: number;
 }
 
@@ -64,6 +64,12 @@ export interface Sale {
   grossAmount: number;
   discountAmount: number;
   netAmount: number;
+  paidAmount?: number;
+  pendingAmount?: number;
+  modality?: string;
+  attentionChannel?: string;
+  paymentConcept?: string;
+  billingType?: string;
   paymentMethod: string;
   leadSource: LeadSource;
   validationStatus: SaleStatus;

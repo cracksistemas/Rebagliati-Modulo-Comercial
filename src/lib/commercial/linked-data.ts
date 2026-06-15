@@ -72,7 +72,7 @@ export function getCompanyGoalProgress(data: LinkedCommercialData) {
   const goalAmount = companyGoal?.goalAmount ?? 120000;
   const accumulated = data.sales
     .filter((sale) => sale.validationStatus === "validada")
-    .reduce((sum, sale) => sum + sale.netAmount, 0);
+    .reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
 
   return {
     goalAmount,
@@ -84,14 +84,14 @@ export function getCompanyGoalProgress(data: LinkedCommercialData) {
 
 export function getExecutiveRankingFromData(data: LinkedCommercialData): ExecutiveRankingItem[] {
   const officialSales = data.sales.filter((sale) => sale.validationStatus === "validada");
-  const totalAmount = officialSales.reduce((sum, sale) => sum + sale.netAmount, 0);
+  const totalAmount = officialSales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
 
   return data.executives
     .map((executive) => {
       const team = data.teams.find((item) => item.id === executive.teamId);
       const executiveSales = officialSales.filter((sale) => sale.executiveId === executive.id);
       const totalQuantity = executiveSales.reduce((sum, sale) => sum + sale.quantity, 0);
-      const totalAmountByExecutive = executiveSales.reduce((sum, sale) => sum + sale.netAmount, 0);
+      const totalAmountByExecutive = executiveSales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
       const totalPoints = executiveSales.reduce((sum, sale) => {
         const type = data.productTypes.find((item) => item.id === sale.productTypeId);
         return sum + sale.quantity * (type?.pointWeight ?? 0);
@@ -122,7 +122,7 @@ export function getExecutiveRankingFromData(data: LinkedCommercialData): Executi
 
 export function getTeamRankingFromData(data: LinkedCommercialData): TeamRankingItem[] {
   const officialSales = data.sales.filter((sale) => sale.validationStatus === "validada");
-  const companyTotal = officialSales.reduce((sum, sale) => sum + sale.netAmount, 0);
+  const companyTotal = officialSales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
   const executiveRanking = getExecutiveRankingFromData(data);
 
   return data.teams
@@ -130,7 +130,7 @@ export function getTeamRankingFromData(data: LinkedCommercialData): TeamRankingI
       const members = data.executives.filter((executive) => executive.teamId === team.id);
       const teamSales = officialSales.filter((sale) => sale.teamId === team.id);
       const totalQuantity = teamSales.reduce((sum, sale) => sum + sale.quantity, 0);
-      const totalAmount = teamSales.reduce((sum, sale) => sum + sale.netAmount, 0);
+      const totalAmount = teamSales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
       const totalPoints = teamSales.reduce((sum, sale) => {
         const type = data.productTypes.find((item) => item.id === sale.productTypeId);
         return sum + sale.quantity * (type?.pointWeight ?? 0);
@@ -158,11 +158,11 @@ export function getTeamRankingFromData(data: LinkedCommercialData): TeamRankingI
 
 export function getProductMixFromData(data: LinkedCommercialData): ProductMixItem[] {
   const officialSales = data.sales.filter((sale) => sale.validationStatus === "validada");
-  const total = officialSales.reduce((sum, sale) => sum + sale.netAmount, 0);
+  const total = officialSales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
 
   return data.productTypes.map((type) => {
     const items = officialSales.filter((sale) => sale.productTypeId === type.id);
-    const totalAmount = items.reduce((sum, sale) => sum + sale.netAmount, 0);
+    const totalAmount = items.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
     const totalQuantity = items.reduce((sum, sale) => sum + sale.quantity, 0);
     return {
       code: type.code,
@@ -191,7 +191,7 @@ export function getDailyAccumulatedFromData(data: LinkedCommercialData) {
   const byDate = data.sales
     .filter((sale) => sale.validationStatus === "validada")
     .reduce<Record<string, number>>((acc, sale) => {
-      acc[sale.saleDate] = (acc[sale.saleDate] ?? 0) + sale.netAmount;
+      acc[sale.saleDate] = (acc[sale.saleDate] ?? 0) + saleAmountForGoal(sale);
       return acc;
     }, {});
 
@@ -202,6 +202,11 @@ export function getDailyAccumulatedFromData(data: LinkedCommercialData) {
       running += amount;
       return { date, amount: running };
     });
+}
+
+function saleAmountForGoal(sale: Sale) {
+  const paidAmount = Number((sale as Sale & { paidAmount?: number }).paidAmount ?? 0);
+  return paidAmount > 0 ? paidAmount : Number(sale.netAmount ?? 0);
 }
 
 function getLocalExecutives() {

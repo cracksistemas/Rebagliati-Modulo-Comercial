@@ -76,7 +76,7 @@ export function ExecutiveManagement() {
 
   function openEditor(executive?: Executive) {
     const linkedUser = executive ? userForExecutive(executive, state.users) : undefined;
-    const draft = executive ?? { ...emptyExecutive, id: crypto.randomUUID() };
+    const draft = executive ?? { ...emptyExecutive, id: crypto.randomUUID(), code: nextCodeForRole("Ejecutivo", state.executives, state.users) };
     setEditing({
       ...draft,
       email: linkedUser?.email ?? "",
@@ -102,10 +102,11 @@ export function ExecutiveManagement() {
     setSaveStatus("Guardando ejecutivo...");
     try {
       const photoDataUrl = photoFile && photoPreview ? await cropPhotoToDataUrl(photoPreview, crop) : undefined;
+      const executiveCode = editing.code?.trim() || nextCodeForRole(editing.role ?? "Ejecutivo", state.executives, state.users, editing.id);
       const response = await fetch("/api/commercial/executives", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...editing, photoDataUrl })
+        body: JSON.stringify({ ...editing, code: executiveCode, photoDataUrl })
       });
       const payload = (await response.json()) as { ok?: boolean; error?: string; data?: any };
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? "No se pudo guardar el ejecutivo.");
@@ -154,6 +155,26 @@ export function ExecutiveManagement() {
       setEditing(null);
     } catch (error) {
       setSaveStatus(error instanceof Error ? error.message : "No se pudo guardar el ejecutivo.");
+    }
+  }
+
+  async function deactivateExecutivePersisted(executive: Executive) {
+    setSaveStatus(`Dando de baja a ${executive.fullName}...`);
+    const nextExecutive = { ...executive, status: "Baja" as const };
+    deactivateExecutive(executive.id);
+    setState(getCommercialState());
+    try {
+      const response = await fetch(`/api/commercial/executives?id=${encodeURIComponent(executive.id)}`, { method: "DELETE" });
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "No se pudo dar de baja en Supabase.");
+      setSaveStatus(`${executive.fullName} fue dado de baja.`);
+    } catch (error) {
+      setSaveStatus(error instanceof Error ? error.message : "No se pudo dar de baja en Supabase.");
+      const current = getCommercialState();
+      setCommercialState({
+        ...current,
+        executives: current.executives.map((item) => (item.id === executive.id ? nextExecutive : item))
+      });
     }
   }
 
@@ -277,7 +298,7 @@ export function ExecutiveManagement() {
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="icon-button" onClick={() => openEditor(item)} title="Editar perfil"><Pencil size={16} /></button>
                   <button className="icon-button" onClick={() => openEditor(item)} title="Subir foto"><Camera size={16} /></button>
-                  <button className="icon-button" onClick={() => deactivateExecutive(item.id)} title="Dar de baja"><Trash2 size={16} /></button>
+                  <button className="icon-button" onClick={() => deactivateExecutivePersisted(item)} title="Dar de baja"><Trash2 size={16} /></button>
                 </div>
               </td>
             </tr>
@@ -345,7 +366,10 @@ export function ExecutiveManagement() {
                 </div>
                 <div className="field">
                   <label>Rol</label>
-                  <select value={editing.role ?? "Ejecutivo"} onChange={(event) => setEditing({ ...editing, role: event.target.value })}>
+                  <select
+                    value={editing.role ?? "Ejecutivo"}
+                    onChange={(event) => setEditing({ ...editing, role: event.target.value, code: nextCodeForRole(event.target.value, state.executives, state.users, editing.id) })}
+                  >
                     {roles.map((role) => <option key={role}>{role}</option>)}
                   </select>
                 </div>
@@ -359,7 +383,7 @@ export function ExecutiveManagement() {
                 </div>
                 <div className="field">
                   <label>Codigo</label>
-                  <input value={editing.code} onChange={(event) => setEditing({ ...editing, code: event.target.value })} />
+                  <input value={editing.code} readOnly />
                 </div>
                 <div className="field">
                   <label>Equipo</label>
@@ -441,6 +465,31 @@ function dedupeExecutives(executives: Executive[]) {
     if (!existing || existing.status === "Baja") byKey.set(key, executive);
   });
   return Array.from(byKey.values());
+}
+
+function nextCodeForRole(role: string, executives: Executive[], users: UserProfile[], editingId = "") {
+  const prefix = codePrefixForRole(role);
+  const usedCodes = [
+    ...executives.filter((item) => item.id !== editingId).map((item) => item.code),
+    ...users.filter((item) => item.executiveId !== editingId).map((item) => item.code ?? "")
+  ];
+  const max = usedCodes.reduce((highest, code) => {
+    const match = String(code).match(new RegExp(`^${prefix}-(\\d+)$`, "i"));
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
+}
+
+function codePrefixForRole(role: string) {
+  const normalized = role.toLowerCase();
+  if (normalized.includes("super")) return "SA";
+  if (normalized.includes("admin")) return "AD";
+  if (normalized.includes("gerencia")) return "GE";
+  if (normalized.includes("jefe")) return "JV";
+  if (normalized.includes("lider")) return "LV";
+  if (normalized.includes("supervisor")) return "SU";
+  if (normalized.includes("marketing")) return "MK";
+  return "E";
 }
 
 function cropPhotoToDataUrl(source: string, crop: { x: number; y: number; zoom: number }) {

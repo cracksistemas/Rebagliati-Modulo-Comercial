@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   Flag,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/executives", label: "Ejecutivos", icon: Flag, permission: "executives.manage" },
   { href: "/incidents", label: "Incidencias", icon: AlertTriangle, permission: "incidents.view" },
   { href: "/goals", label: "Metas", icon: Target, permission: "goals.manage" },
+  { href: "/training", label: "Academia Comercial", icon: GraduationCap, permission: "training.view" },
   { href: "/sales/validation", label: "Validación de ventas", icon: ClipboardCheck, permission: "sales.validation" },
   { href: "/customer-map", label: "Mapa de Clientes", icon: BookOpenCheck, permission: "customer-map.view" },
   { href: "/reports", label: "Reportes", icon: BarChart3, permission: "reports.export" },
@@ -57,6 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.includes("settings")) return "Configuración";
     if (pathname.includes("executives")) return "Directorio comercial";
     if (pathname.includes("incidents")) return "Incidencias";
+    if (pathname.includes("training")) return "Academia Comercial";
     if (pathname.includes("teams")) return "Ventas por equipo";
     if (pathname.includes("ranking")) return "Ranking de ejecutivos";
     if (pathname.includes("sales")) return "Control de ventas";
@@ -102,19 +105,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const visibleNavItems = useMemo(() => {
+    const role = profile?.role.toLowerCase() ?? "";
+    if (role.includes("super") || role.includes("admin_sistema")) return navItems;
     if (profile?.permissions?.length) {
       return navItems.filter((item) => profile.permissions?.includes(item.permission));
     }
 
-    const role = profile?.role.toLowerCase() ?? "";
     if (role.includes("ejecutivo") && !role.includes("lider")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/sales/new", "/ranking", "/teams", "/incidents", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/sales/new", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
       );
     }
     if (role.includes("marketing") || role.includes("solo lectura") || role.includes("marketing_soporte")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/ranking", "/teams", "/incidents", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
       );
     }
     return navItems;
@@ -178,7 +182,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div>
             <p className="eyebrow">Panel interno</p>
             <h1>{title}</h1>
-            {profile?.greeting ? <p className="muted" style={{ marginTop: 8 }}>{profile.greeting}</p> : null}
+            <p className="muted" style={{ marginTop: 8 }}>
+              {timeGreeting()} {profile?.fullName ? profile.fullName.split(" ")[0] : "equipo"}. {profile?.greeting ?? "Revisa tus prioridades comerciales del día."}
+            </p>
           </div>
           <div className="topbar-actions">
             <span className="badge">Junio 2026</span>
@@ -197,4 +203,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
     </div>
   );
+}
+
+function timeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Buenos días";
+  if (hour < 19) return "Buenas tardes";
+  return "Buenas noches";
 }
