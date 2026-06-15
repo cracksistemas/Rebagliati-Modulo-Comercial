@@ -26,6 +26,27 @@ type ConfirmAction = {
 
 type EditOptionKind = "program" | "discount" | "payment" | "lead";
 type ValidationErrors = Partial<Record<"saleDate" | "executiveId" | "teamId" | "productName" | "grossAmount", string>>;
+type SalesValidationFilters = {
+  dateFrom: string;
+  dateTo: string;
+  executiveId: string;
+  teamId: string;
+  event: string;
+  validationStatus: string;
+  minAmount: string;
+  maxAmount: string;
+};
+
+const emptyFilters: SalesValidationFilters = {
+  dateFrom: "",
+  dateTo: "",
+  executiveId: "",
+  teamId: "",
+  event: "",
+  validationStatus: "",
+  minAmount: "",
+  maxAmount: ""
+};
 
 function statusLabel(status: SaleStatus) {
   const labels: Record<SaleStatus, string> = {
@@ -105,6 +126,7 @@ export function SalesValidationView() {
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState("");
   const [visibleCount, setVisibleCount] = useState(40);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [filters, setFilters] = useState<SalesValidationFilters>(emptyFilters);
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
 
@@ -161,10 +183,40 @@ export function SalesValidationView() {
       }),
     [state.sales]
   );
-  const visibleSales = sales.slice(0, visibleCount);
+  const filteredSales = useMemo(
+    () =>
+      sales.filter((sale) => {
+        const amount = Number(sale.netAmount ?? 0);
+        if (filters.dateFrom && sale.saleDate < filters.dateFrom) return false;
+        if (filters.dateTo && sale.saleDate > filters.dateTo) return false;
+        if (filters.executiveId && sale.executiveId !== filters.executiveId) return false;
+        if (filters.teamId && (sale.teamId ?? "") !== filters.teamId) return false;
+        if (filters.validationStatus && sale.validationStatus !== filters.validationStatus) return false;
+        if (filters.minAmount && amount < Number(filters.minAmount)) return false;
+        if (filters.maxAmount && amount > Number(filters.maxAmount)) return false;
+        if (filters.event.trim()) {
+          const query = normalizeSearch(filters.event);
+          const searchable = normalizeSearch(`${sale.productType} ${sale.productName} ${sale.notes ?? ""}`);
+          if (!searchable.includes(query)) return false;
+        }
+        return true;
+      }),
+    [filters, sales]
+  );
+  const visibleSales = filteredSales.slice(0, visibleCount);
   const draftErrors = useMemo(() => validateSaleDraft(editingSale), [editingSale]);
   const hasDraftErrors = Object.keys(draftErrors).length > 0;
   const hasUnsavedChanges = !isSameSale(editingSale, originalEditingSale);
+
+  function updateFilter<K extends keyof SalesValidationFilters>(key: K, value: SalesValidationFilters[K]) {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setVisibleCount(40);
+  }
+
+  function clearFilters() {
+    setFilters(emptyFilters);
+    setVisibleCount(40);
+  }
 
   function localUpdate(updatedSale: Sale) {
     const current = getCommercialState();
@@ -367,6 +419,55 @@ export function SalesValidationView() {
         {status ? <span className="validation-toast">{status}</span> : null}
       </div>
 
+      <div className="sales-filter-panel">
+        <div className="sales-filter-title">
+          <p className="eyebrow">Filtros</p>
+          <strong>{filteredSales.length} venta(s)</strong>
+        </div>
+        <label>
+          Fecha desde
+          <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter("dateFrom", event.target.value)} />
+        </label>
+        <label>
+          Fecha hasta
+          <input type="date" value={filters.dateTo} onChange={(event) => updateFilter("dateTo", event.target.value)} />
+        </label>
+        <label>
+          Ejecutivo
+          <select value={filters.executiveId} onChange={(event) => updateFilter("executiveId", event.target.value)}>
+            <option value="">Todos</option>
+            {state.executives.map((executive) => <option key={executive.id} value={executive.id}>{executive.fullName}</option>)}
+          </select>
+        </label>
+        <label>
+          Equipo
+          <select value={filters.teamId} onChange={(event) => updateFilter("teamId", event.target.value)}>
+            <option value="">Todos</option>
+            {state.teams.filter((team) => team.active).map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+          </select>
+        </label>
+        <label>
+          Evento
+          <input value={filters.event} onChange={(event) => updateFilter("event", event.target.value)} placeholder="Programa o producto" />
+        </label>
+        <label>
+          Estado
+          <select value={filters.validationStatus} onChange={(event) => updateFilter("validationStatus", event.target.value)}>
+            <option value="">Todos</option>
+            {statusOptions.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
+          </select>
+        </label>
+        <label>
+          Monto min.
+          <input type="number" min={0} value={filters.minAmount} onChange={(event) => updateFilter("minAmount", event.target.value)} />
+        </label>
+        <label>
+          Monto max.
+          <input type="number" min={0} value={filters.maxAmount} onChange={(event) => updateFilter("maxAmount", event.target.value)} />
+        </label>
+        <button className="ghost-button" type="button" onClick={clearFilters}>Limpiar filtros</button>
+      </div>
+
       <div className="sales-validation-table-wrap">
         <table className="table sales-validation-table">
           <thead>
@@ -405,16 +506,16 @@ export function SalesValidationView() {
                 </tr>
               );
             })}
-            {!sales.length ? (
+            {!visibleSales.length ? (
               <tr>
-                <td colSpan={7} className="muted">No hay ventas registradas para validar.</td>
+                <td colSpan={7} className="muted">{sales.length ? "No hay ventas con los filtros seleccionados." : "No hay ventas registradas para validar."}</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
 
-      {visibleCount < sales.length ? (
+      {visibleCount < filteredSales.length ? (
         <div className="sales-load-more">
           <button className="ghost-button" onClick={() => setVisibleCount((current) => current + 40)}>Cargar mas ventas</button>
         </div>
@@ -845,4 +946,12 @@ function optionModalTitle(kind: EditOptionKind) {
   if (kind === "discount") return "Agregar o editar descuento";
   if (kind === "payment") return "Agregar o editar medio de pago";
   return "Agregar o editar origen del lead";
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
