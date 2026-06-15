@@ -80,6 +80,247 @@
   padding: 0;
 }
 
+.sales-validation-card {
+  padding: 22px;
+}
+
+.sales-validation-header,
+.sales-modal-header,
+.sales-modal-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sales-validation-header h2,
+.sales-edit-modal h2,
+.sales-modal-small h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 1.7vw, 1.6rem);
+}
+
+.validation-toast {
+  max-width: 430px;
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: rgba(0, 167, 235, 0.12);
+  color: var(--reba-primary);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.sales-validation-table-wrap {
+  overflow: auto;
+  margin-top: 18px;
+}
+
+.sales-validation-table {
+  min-width: 1040px;
+}
+
+.sales-validation-table td {
+  transition: background 180ms ease;
+}
+
+.sale-row-updated td {
+  background: rgba(52, 199, 89, 0.08);
+}
+
+.sales-row-actions {
+  display: flex;
+  min-width: 360px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ghost-button,
+.primary-button,
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  border-radius: 999px;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-weight: 800;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.ghost-button:hover,
+.primary-button:hover,
+.danger-button:hover {
+  transform: translateY(-1px);
+}
+
+.ghost-button:disabled,
+.primary-button:disabled,
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+  box-shadow: none;
+}
+
+.ghost-button {
+  background: rgba(142, 142, 147, 0.12);
+  color: var(--text-main);
+}
+
+.primary-button {
+  background: var(--reba-accent);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(0, 167, 235, 0.24);
+}
+
+.danger-button {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--danger);
+}
+
+.modal {
+  width: min(760px, 100%);
+  max-height: min(90vh, 860px);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.sales-edit-modal {
+  width: min(920px, 94vw);
+}
+
+.sales-modal-small {
+  width: min(560px, 94vw);
+}
+
+.sales-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sales-edit-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label,
+.sales-confirm-check {
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(245, 245, 247, 0.72);
+  color: var(--text-main);
+  outline: none;
+}
+
+.field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: rgba(0, 167, 235, 0.74);
+  box-shadow: 0 0 0 4px rgba(0, 167, 235, 0.12);
+}
+
+.invalid-field {
+  border-color: rgba(255, 59, 48, 0.72) !important;
+  box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.08) !important;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.sales-net-preview {
+  justify-content: end;
+}
+
+.sales-net-preview strong {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(0, 167, 235, 0.1);
+  color: var(--reba-primary);
+}
+
+.sales-span-all {
+  grid-column: 1 / -1;
+}
+
+.sales-modal-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.sales-confirm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 16px;
+  padding: 13px;
+  background: rgba(245, 245, 247, 0.82);
+}
+
+.sales-confirm-check input {
+  margin-top: 3px;
+}
+
+.sales-confirm-summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sales-confirm-summary span {
+  display: grid;
+  gap: 4px;
+  border-radius: 16px;
+  padding: 13px;
+  background: rgba(245, 245, 247, 0.82);
+  color: var(--text-muted);
+}
+
+.sales-confirm-summary strong {
+  color: var(--text-main);
+}
+
+.sales-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
 @media (max-width: 720px) {
   .sale-form {
     grid-template-columns: 1fr;
@@ -87,5 +328,66 @@
 
   .span-2 {
     grid-column: auto;
+  }
+
+  .sales-validation-card {
+    padding: 16px;
+  }
+
+  .sales-validation-table {
+    min-width: 0;
+  }
+
+  .sales-validation-table thead {
+    display: none;
+  }
+
+  .sales-validation-table,
+  .sales-validation-table tbody,
+  .sales-validation-table tr,
+  .sales-validation-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .sales-validation-table tr {
+    border-bottom: 1px solid var(--border-soft);
+    padding: 14px 0;
+  }
+
+  .sales-validation-table td {
+    display: grid;
+    grid-template-columns: 118px minmax(0, 1fr);
+    gap: 10px;
+    border-bottom: 0;
+    padding: 7px 0;
+  }
+
+  .sales-validation-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .sales-row-actions {
+    min-width: 0;
+  }
+
+  .sales-row-actions button {
+    flex: 1 1 130px;
+  }
+
+  .sales-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-modal-actions {
+    flex-direction: column;
+  }
+
+  .sales-modal-actions button {
+    width: 100%;
   }
 }
