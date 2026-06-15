@@ -167,7 +167,7 @@ export function CommercialGoalsCenter() {
               <option>Canal</option>
             </select>
           </label>
-          <Button onClick={() => setEditOpen(true)}><Pencil size={17} /> Editar meta</Button>
+          <Button className="goal-edit-button" onClick={() => setEditOpen(true)}><Pencil size={17} /> Editar meta</Button>
         </div>
       </section>
 
@@ -337,6 +337,7 @@ export function CommercialGoalsCenter() {
         goalAmount={formGoal}
         goalStatus={goalStatus}
         changeReason={changeReason}
+        metrics={metrics}
         saving={saving}
         onGoalChange={setFormGoal}
         onStatusChange={setGoalStatus}
@@ -509,6 +510,7 @@ function GoalEditModal(props: {
   goalAmount: number;
   goalStatus: GoalStatus;
   changeReason: string;
+  metrics: GoalMetrics;
   saving: boolean;
   onGoalChange: (value: number) => void;
   onStatusChange: (value: GoalStatus) => void;
@@ -517,47 +519,78 @@ function GoalEditModal(props: {
   onSave: () => void;
 }) {
   const canSave = props.goalAmount > 0 && props.changeReason.trim().length >= 6 && !props.saving;
+  const projectedProgress = props.goalAmount ? (props.metrics.accumulated / props.goalAmount) * 100 : 0;
+  const projectedGap = Math.max(props.goalAmount - props.metrics.accumulated, 0);
+  const variation = props.goalAmount - props.metrics.goalAmount;
   return (
-    <Modal open={props.open} title="Editar meta mensual" description="Todo cambio de meta activa requiere motivo para conservar trazabilidad." onClose={props.onClose}>
-      <div className="goals-modal-grid">
-        <label>
-          Periodo
-          <input value="Junio 2026" readOnly />
-        </label>
-        <label>
-          Tipo de meta
-          <select defaultValue="Venta neta">
-            <option>Venta neta</option>
-            <option>Venta bruta</option>
-            <option>Matriculas</option>
-            <option>Ingresos cobrados</option>
-            <option>Ventas confirmadas</option>
-          </select>
-        </label>
-        <label>
-          Moneda
-          <select defaultValue="PEN"><option value="PEN">Soles PEN</option></select>
-        </label>
-        <label>
-          Estado
-          <select value={props.goalStatus} onChange={(event) => props.onStatusChange(event.target.value as GoalStatus)}>
-            <option>Borrador</option>
-            <option>Activa</option>
-            <option>Cerrada</option>
-            <option>Recalculada</option>
-            <option>Archivada</option>
-          </select>
-        </label>
-        <label>
-          Meta mensual empresa
-          <input type="number" min={1} value={props.goalAmount || ""} onChange={(event) => props.onGoalChange(Number(event.target.value || 0))} />
-        </label>
-        <label className="wide">
-          Motivo del cambio
-          <textarea value={props.changeReason} onChange={(event) => props.onReasonChange(event.target.value)} placeholder="Ej. Ajuste por incremento de campanas activas" />
-        </label>
+    <Modal open={props.open} title="Editar meta mensual" description="Define la meta oficial que alimenta Dashboard, ranking, brechas y pronosticos." onClose={props.onClose}>
+      <div className="goal-edit-modal">
+        <div className="goal-edit-summary">
+          <div>
+            <span>Meta actual</span>
+            <strong>{money(props.metrics.goalAmount)}</strong>
+          </div>
+          <div>
+            <span>Nueva meta</span>
+            <strong>{money(props.goalAmount)}</strong>
+          </div>
+          <div className={variation >= 0 ? "is-watch" : "is-good"}>
+            <span>Variacion</span>
+            <strong>{variation >= 0 ? "+" : ""}{money(variation)}</strong>
+          </div>
+        </div>
+
+        <div className="goals-modal-grid">
+          <label>
+            Periodo
+            <input value="Junio 2026" readOnly />
+          </label>
+          <label>
+            Estado de meta
+            <select value={props.goalStatus} onChange={(event) => props.onStatusChange(event.target.value as GoalStatus)}>
+              <option>Borrador</option>
+              <option>Activa</option>
+              <option>Cerrada</option>
+              <option>Recalculada</option>
+              <option>Archivada</option>
+            </select>
+          </label>
+          <label>
+            Alcance
+            <select defaultValue="Empresa">
+              <option>Empresa</option>
+              <option>Equipo</option>
+              <option>Ejecutivo</option>
+              <option>Producto / Curso</option>
+              <option>Canal</option>
+            </select>
+          </label>
+          <label>
+            Monto que impacta meta
+            <select defaultValue="Monto pagado validado">
+              <option>Monto pagado validado</option>
+              <option>Monto neto vendido</option>
+              <option>Puntos comerciales</option>
+            </select>
+          </label>
+          <label className="wide goal-amount-field">
+            Meta mensual empresa
+            <input type="number" min={1} value={props.goalAmount || ""} onChange={(event) => props.onGoalChange(Number(event.target.value || 0))} autoFocus />
+          </label>
+          <div className="goal-readonly-grid wide">
+            <span>Acumulado actual <strong>{money(props.metrics.accumulated)}</strong></span>
+            <span>Avance con nueva meta <strong>{pct(projectedProgress)}</strong></span>
+            <span>Brecha proyectada <strong>{money(projectedGap)}</strong></span>
+            <span>Venta diaria requerida <strong>{money(props.metrics.requiredDailySales)}</strong></span>
+          </div>
+          <label className="wide">
+            Motivo del cambio
+            <textarea value={props.changeReason} onChange={(event) => props.onReasonChange(event.target.value)} placeholder="Ej. Ajuste por incremento de campañas activas, nuevo objetivo de gerencia o redistribución mensual." />
+            <small>{props.changeReason.trim().length < 6 ? "Es obligatorio registrar un motivo para auditoria." : "El motivo quedara registrado en auditoria."}</small>
+          </label>
+        </div>
       </div>
-      <div className="editor-actions">
+      <div className="editor-actions goal-editor-actions">
         <Button variant="secondary" onClick={props.onClose}>Cancelar</Button>
         <Button disabled={!canSave} onClick={props.onSave}><Save size={17} /> {props.saving ? "Guardando..." : "Guardar meta"}</Button>
       </div>

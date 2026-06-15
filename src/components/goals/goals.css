@@ -57,6 +57,11 @@
   min-width: 150px;
 }
 
+.goal-edit-button {
+  min-width: 138px;
+  box-shadow: 0 14px 28px rgba(0, 167, 235, 0.2);
+}
+
 .goal-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -339,6 +344,54 @@
   gap: 14px;
 }
 
+.goal-edit-modal {
+  display: grid;
+  gap: 18px;
+}
+
+.goal-edit-summary,
+.goal-readonly-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-edit-summary div,
+.goal-readonly-grid span {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(229, 229, 234, 0.82);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(245, 245, 247, 0.82);
+  color: var(--text-muted);
+}
+
+.goal-edit-summary strong,
+.goal-readonly-grid strong {
+  color: var(--text-main);
+  font-size: clamp(1.05rem, 1.45vw, 1.35rem);
+}
+
+.goal-amount-field input {
+  min-height: 54px;
+  border-radius: 18px;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  font-weight: 900;
+}
+
+.goals-modal-grid small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-transform: none;
+}
+
+.goal-editor-actions {
+  margin-top: 18px;
+  justify-content: flex-end;
+}
+
 .goals-modal-grid .wide {
   grid-column: 1 / -1;
 }
@@ -409,6 +462,8 @@
   .goal-kpi-grid,
   .forecast-grid,
   .goals-modal-grid,
+  .goal-edit-summary,
+  .goal-readonly-grid,
   .close-summary {
     grid-template-columns: 1fr;
   }
