@@ -128,6 +128,12 @@
   gap: 8px;
 }
 
+.option-inline .icon-button {
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+}
+
 .sales-warning {
   display: flex;
   align-items: center;
@@ -287,6 +293,7 @@
 
 .sales-edit-modal {
   width: min(920px, 94vw);
+  position: relative;
 }
 
 .sales-modal-small {
@@ -302,6 +309,11 @@
 
 .sales-edit-grid.single {
   grid-template-columns: 1fr;
+}
+
+.sales-edit-grid.compact {
+  margin-top: 12px;
+  gap: 10px;
 }
 
 .field {
@@ -340,6 +352,31 @@
 .field textarea:focus {
   border-color: rgba(0, 167, 235, 0.74);
   box-shadow: 0 0 0 4px rgba(0, 167, 235, 0.12);
+}
+
+.sales-nested-modal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(245, 245, 247, 0.68);
+  backdrop-filter: blur(10px);
+  border-radius: var(--radius-lg);
+}
+
+.sales-nested-panel {
+  width: min(460px, 92vw);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(29, 29, 31, 0.16);
+}
+
+.sales-nested-panel h3 {
+  margin: 0 0 14px;
+  font-size: 1.12rem;
 }
 
 .invalid-field {

@@ -1,11 +1,11 @@
 "use client";
 
-import { Ban, Check, Pencil, X } from "lucide-react";
+import { Ban, Check, Pencil, Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
-import type { ProductType, Sale, SaleStatus } from "@/lib/commercial/types";
+import type { AuthorizedDiscount, CommercialOption, ProductType, Sale, SalesProgram, SaleStatus } from "@/lib/commercial/types";
 
 const productTypes: ProductType[] = ["Curso", "Curso Modular", "Diplomado", "Taller", "Seminario", "Certifícate", "Asincrónico", "Otro"];
 const statusOptions: SaleStatus[] = ["registrada", "pendiente_validacion", "validada", "observada", "rechazada", "anulada", "pago_parcial", "saldo_pendiente", "completada"];
@@ -24,6 +24,7 @@ type ConfirmAction = {
   validationStatus: SaleStatus;
 };
 
+type EditOptionKind = "program" | "discount" | "payment" | "lead";
 type ValidationErrors = Partial<Record<"saleDate" | "executiveId" | "teamId" | "productName" | "grossAmount", string>>;
 
 function statusLabel(status: SaleStatus) {
@@ -74,6 +75,22 @@ async function persistSale(sale: Sale, action: "update" | "annul" = "update", an
   return payload.data;
 }
 
+function persistCommercialOption(payload: { kind: "program" | "lead" | "payment"; name: string; productType?: ProductType }) {
+  fetch("/api/commercial/options", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).catch(() => undefined);
+}
+
+function persistDiscounts(discounts: AuthorizedDiscount[]) {
+  fetch("/api/admin/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ discounts })
+  }).catch(() => undefined);
+}
+
 export function SalesValidationView() {
   const [state, setState] = useState(getCommercialState);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
@@ -90,6 +107,42 @@ export function SalesValidationView() {
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   useEffect(() => subscribeCommercialDataChange(() => setState(getCommercialState())), []);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadOptions() {
+      try {
+        const response = await fetch("/api/commercial/options", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: {
+            programs?: SalesProgram[];
+            discounts?: AuthorizedDiscount[];
+            leadSources?: CommercialOption[];
+            paymentMethods?: CommercialOption[];
+          };
+        };
+        if (!alive || !response.ok || !payload.ok || !payload.data) return;
+        setState((current) => {
+          const next = {
+            ...current,
+            programs: payload.data?.programs ?? current.programs,
+            discounts: payload.data?.discounts ?? current.discounts,
+            leadSources: payload.data?.leadSources ?? current.leadSources,
+            paymentMethods: payload.data?.paymentMethods ?? current.paymentMethods
+          };
+          setCommercialState(next);
+          return next;
+        });
+      } catch {
+        undefined;
+      }
+    }
+    loadOptions();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!recentlyUpdatedId) return;
@@ -248,6 +301,61 @@ export function SalesValidationView() {
     setEditingSale(next);
   }
 
+  function upsertEditOption(kind: EditOptionKind, name: string, meta?: { amount?: number; discountType?: "amount" | "percent" }) {
+    const cleanName = name.trim();
+    if (!cleanName || !editingSale) return;
+
+    if (kind === "program") {
+      const exists = state.programs.some((item) => sameText(item.name, cleanName));
+      const nextProgram: SalesProgram = {
+        id: `program-${crypto.randomUUID()}`,
+        name: cleanName,
+        productType: editingSale.productType,
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      const next = { ...state, programs: exists ? state.programs : [nextProgram, ...state.programs] };
+      setState(next);
+      setCommercialState(next);
+      updateDraft("productName", cleanName);
+      persistCommercialOption({ kind: "program", name: cleanName, productType: editingSale.productType });
+      return;
+    }
+
+    if (kind === "discount") {
+      const amount = Math.max(Number(meta?.amount ?? 0), 0);
+      const nextDiscount: AuthorizedDiscount = {
+        id: `discount-${crypto.randomUUID()}`,
+        label: cleanName,
+        amount,
+        discountType: meta?.discountType ?? "amount",
+        active: true
+      };
+      const exists = state.discounts.some((item) => sameText(item.label, cleanName));
+      const discounts = exists ? state.discounts.map((item) => (sameText(item.label, cleanName) ? { ...item, amount, discountType: nextDiscount.discountType } : item)) : [nextDiscount, ...state.discounts];
+      const next = { ...state, discounts };
+      setState(next);
+      setCommercialState(next);
+      updateDraft("discountAmount", nextDiscount.discountType === "percent" ? Math.round((editingSale.grossAmount * amount) / 100) : amount);
+      persistDiscounts(discounts);
+      return;
+    }
+
+    const field = kind === "lead" ? "leadSources" : "paymentMethods";
+    const exists = state[field].some((item) => sameText(item.label, cleanName));
+    const nextOption: CommercialOption = {
+      id: `${kind}-${crypto.randomUUID()}`,
+      label: cleanName,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    const next = { ...state, [field]: exists ? state[field] : [nextOption, ...state[field]] };
+    setState(next);
+    setCommercialState(next);
+    updateDraft(kind === "lead" ? "leadSource" : "paymentMethod", cleanName);
+    persistCommercialOption({ kind: kind === "lead" ? "lead" : "payment", name: cleanName });
+  }
+
   return (
     <section className="card sales-validation-card">
       <div className="sales-validation-header">
@@ -318,8 +426,13 @@ export function SalesValidationView() {
         saving={saving}
         executives={state.executives}
         teams={state.teams}
+        programs={state.programs}
+        discounts={state.discounts}
+        paymentMethods={state.paymentMethods}
+        leadSources={state.leadSources}
         errors={draftErrors}
         onChange={updateDraft}
+        onOptionUpdate={upsertEditOption}
         onClose={requestCloseEdit}
         onSave={saveEditedSale}
       />
@@ -392,8 +505,13 @@ function EditSaleModal({
   saving,
   executives,
   teams,
+  programs,
+  discounts,
+  paymentMethods,
+  leadSources,
   errors,
   onChange,
+  onOptionUpdate,
   onClose,
   onSave
 }: {
@@ -402,13 +520,55 @@ function EditSaleModal({
   saving: boolean;
   executives: ReturnType<typeof getCommercialState>["executives"];
   teams: ReturnType<typeof getCommercialState>["teams"];
+  programs: ReturnType<typeof getCommercialState>["programs"];
+  discounts: ReturnType<typeof getCommercialState>["discounts"];
+  paymentMethods: ReturnType<typeof getCommercialState>["paymentMethods"];
+  leadSources: ReturnType<typeof getCommercialState>["leadSources"];
   errors: ValidationErrors;
   onChange: <K extends keyof Sale>(key: K, value: Sale[K]) => void;
+  onOptionUpdate: (kind: EditOptionKind, name: string, meta?: { amount?: number; discountType?: "amount" | "percent" }) => void;
   onClose: () => void;
   onSave: () => void;
 }) {
+  const [optionModal, setOptionModal] = useState<null | EditOptionKind>(null);
+  const [optionDraft, setOptionDraft] = useState("");
+  const [discountAmountDraft, setDiscountAmountDraft] = useState("");
+  const [discountTypeDraft, setDiscountTypeDraft] = useState<"amount" | "percent">("amount");
   if (!sale) return null;
   const saveDisabled = saving || Object.keys(errors).length > 0;
+  const activePrograms = programs.filter((item) => item.active && item.productType === sale.productType);
+  const programOptions = uniqueStrings([sale.productName, ...activePrograms.map((item) => item.name)]);
+  const paymentOptions = uniqueStrings([sale.paymentMethod, ...paymentMethods.filter((item) => item.active).map((item) => item.label)]);
+  const leadOptions = uniqueStrings([sale.leadSource, ...leadSources.filter((item) => item.active).map((item) => item.label)]);
+  const selectedDiscount = discounts.find((item) => {
+    const computed = item.discountType === "percent" ? Math.round((sale.grossAmount * item.amount) / 100) : item.amount;
+    return computed === sale.discountAmount;
+  });
+
+  function openOption(kind: EditOptionKind, currentValue = "") {
+    if (!sale) return;
+    setOptionModal(kind);
+    setOptionDraft(currentValue);
+    if (kind === "discount") {
+      setDiscountAmountDraft(String(sale.discountAmount || ""));
+      setDiscountTypeDraft("amount");
+    }
+  }
+
+  function saveOption() {
+    if (!optionModal) return;
+    onOptionUpdate(
+      optionModal,
+      optionDraft,
+      optionModal === "discount"
+        ? { amount: Number(discountAmountDraft || 0), discountType: discountTypeDraft }
+        : undefined
+    );
+    setOptionModal(null);
+    setOptionDraft("");
+    setDiscountAmountDraft("");
+    setDiscountTypeDraft("amount");
+  }
 
   return (
     <div className="modal-backdrop">
@@ -444,7 +604,13 @@ function EditSaleModal({
             </select>
           </Field>
           <Field label="Programa / evento" error={errors.productName}>
-            <input className={errors.productName ? "invalid-field" : ""} value={sale.productName} onChange={(event) => onChange("productName", event.target.value)} />
+            <div className="field-inline option-inline">
+              <select className={errors.productName ? "invalid-field" : ""} value={sale.productName} onChange={(event) => onChange("productName", event.target.value)}>
+                <option value="">Seleccionar programa</option>
+                {programOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <button className="icon-button" type="button" onClick={() => openOption("program", sale.productName)} title="Agregar o editar programa"><Plus size={15} /></button>
+            </div>
           </Field>
           <Field label="Cantidad">
             <input type="number" min={0} value={sale.quantity || ""} onChange={(event) => onChange("quantity", Number(event.target.value || 0))} />
@@ -453,17 +619,45 @@ function EditSaleModal({
             <input className={errors.grossAmount ? "invalid-field" : ""} type="number" min={0} value={sale.grossAmount || ""} onChange={(event) => onChange("grossAmount", Number(event.target.value || 0))} />
           </Field>
           <Field label="Descuento">
-            <input type="number" min={0} value={sale.discountAmount || ""} onChange={(event) => onChange("discountAmount", Number(event.target.value || 0))} />
+            <div className="field-inline option-inline">
+              <select
+                value={selectedDiscount?.id ?? "custom"}
+                onChange={(event) => {
+                  const discount = discounts.find((item) => item.id === event.target.value);
+                  if (!discount) return;
+                  const amount = discount.discountType === "percent" ? Math.round((sale.grossAmount * discount.amount) / 100) : discount.amount;
+                  onChange("discountAmount", amount);
+                }}
+              >
+                <option value="custom">Personalizado: {money(sale.discountAmount || 0)}</option>
+                {discounts.filter((item) => item.active).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label} · {item.discountType === "percent" ? `${item.amount}%` : money(item.amount)}
+                  </option>
+                ))}
+              </select>
+              <button className="icon-button" type="button" onClick={() => openOption("discount", selectedDiscount?.label ?? "Descuento personalizado")} title="Agregar o editar descuento"><Pencil size={15} /></button>
+            </div>
           </Field>
           <div className="field sales-net-preview">
             <label>Monto neto</label>
             <strong>{money(sale.netAmount)}</strong>
           </div>
           <Field label="Medio de pago">
-            <input value={sale.paymentMethod} onChange={(event) => onChange("paymentMethod", event.target.value)} />
+            <div className="field-inline option-inline">
+              <select value={sale.paymentMethod} onChange={(event) => onChange("paymentMethod", event.target.value)}>
+                {paymentOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <button className="icon-button" type="button" onClick={() => openOption("payment", sale.paymentMethod)} title="Agregar o editar medio de pago"><Plus size={15} /></button>
+            </div>
           </Field>
           <Field label="Origen del lead">
-            <input value={sale.leadSource} onChange={(event) => onChange("leadSource", event.target.value)} />
+            <div className="field-inline option-inline">
+              <select value={sale.leadSource} onChange={(event) => onChange("leadSource", event.target.value)}>
+                {leadOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <button className="icon-button" type="button" onClick={() => openOption("lead", sale.leadSource)} title="Agregar o editar origen del lead"><Plus size={15} /></button>
+            </div>
           </Field>
           <Field label="Estado final">
             <select value={sale.validationStatus} onChange={(event) => onChange("validationStatus", event.target.value as SaleStatus)}>
@@ -480,6 +674,35 @@ function EditSaleModal({
           <button className="ghost-button" disabled={saving} onClick={onClose}>Cancelar</button>
           <button className="primary-button" disabled={saveDisabled} onClick={onSave}><Check size={16} /> {saving ? "Guardando..." : "Guardar correccion"}</button>
         </div>
+
+        {optionModal ? (
+          <div className="sales-nested-modal">
+            <div className="sales-nested-panel">
+              <p className="eyebrow">Opciones de venta</p>
+              <h3>{optionModalTitle(optionModal)}</h3>
+              <Field label="Nombre">
+                <input autoFocus value={optionDraft} onChange={(event) => setOptionDraft(event.target.value)} />
+              </Field>
+              {optionModal === "discount" ? (
+                <div className="sales-edit-grid single compact">
+                  <Field label="Tipo de descuento">
+                    <select value={discountTypeDraft} onChange={(event) => setDiscountTypeDraft(event.target.value as "amount" | "percent")}>
+                      <option value="amount">Monto en soles</option>
+                      <option value="percent">Porcentaje</option>
+                    </select>
+                  </Field>
+                  <Field label={discountTypeDraft === "percent" ? "Porcentaje" : "Monto"}>
+                    <input type="number" min={0} value={discountAmountDraft} onChange={(event) => setDiscountAmountDraft(event.target.value)} />
+                  </Field>
+                </div>
+              ) : null}
+              <div className="sales-modal-actions">
+                <button className="ghost-button" type="button" onClick={() => setOptionModal(null)}>Cancelar</button>
+                <button className="primary-button" type="button" onClick={saveOption}>Guardar y aplicar</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -598,4 +821,28 @@ function buildAnnulReason(reasonPreset: string, reasonDetail: string) {
   const detail = reasonDetail.trim();
   if (!detail || reasonPreset === detail) return reasonPreset;
   return `${reasonPreset}: ${detail}`;
+}
+
+function sameText(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+function uniqueStrings(values: Array<string | undefined>) {
+  const seen = new Set<string>();
+  return values
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean)
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function optionModalTitle(kind: EditOptionKind) {
+  if (kind === "program") return "Agregar o editar programa / evento";
+  if (kind === "discount") return "Agregar o editar descuento";
+  if (kind === "payment") return "Agregar o editar medio de pago";
+  return "Agregar o editar origen del lead";
 }
