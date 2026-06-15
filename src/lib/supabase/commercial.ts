@@ -223,6 +223,19 @@ export async function saveCommercialGoal(goal: MonthlyGoal) {
   if (error) throw error;
 }
 
+export async function saveCommercialGoalVersion(goalId: string, previousAmount: number, newAmount: number, changeReason: string) {
+  const supabase = getSupabase();
+  const userId = await getCurrentUserId();
+  const { error } = await supabase.from("commercial_goal_versions").insert({
+    goal_id: goalId,
+    previous_target_amount: previousAmount,
+    new_target_amount: newAmount,
+    change_reason: changeReason,
+    changed_by: userId ?? null
+  });
+  if (error) throw error;
+}
+
 export async function loadCommercialProductTypes(): Promise<ProductType[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase
