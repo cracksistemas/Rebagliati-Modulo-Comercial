@@ -11,7 +11,7 @@ const publicPaths = new Set([
 ]);
 
 function isPublicPath(pathname: string) {
-  return publicPaths.has(pathname);
+  return publicPaths.has(pathname) || pathname.startsWith("/api/maintenance/");
 }
 
 function isAssetPath(pathname: string) {
@@ -66,6 +66,10 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (isAssetPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (isPublicPath(pathname) && isApiPath(pathname)) {
     return NextResponse.next();
   }
 
