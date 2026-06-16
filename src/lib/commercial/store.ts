@@ -147,7 +147,7 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
       followups: asArray(sale.followups, seedSale.followups ?? []),
       modalityDetails: sale.modalityDetails ?? seedSale.modalityDetails
     };
-  });
+  }).filter((sale) => !isImportedJuneRankingSale(sale));
 
   return {
     ...seedState,
@@ -174,6 +174,11 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
     audit: asArray(source.audit, seedState.audit),
     clientProfiles: asArray(source.clientProfiles, seedState.clientProfiles)
   };
+}
+
+function isImportedJuneRankingSale(sale: Sale & { sourceKey?: string }) {
+  const marker = `${sale.sourceKey ?? ""} ${sale.productName ?? ""} ${sale.notes ?? ""}`.toLowerCase();
+  return marker.includes("ranking-junio-2026-mtd") || marker.includes("carga historica acumulada junio 2026 desde ranking");
 }
 
 export function getCommercialState(): CommercialState {

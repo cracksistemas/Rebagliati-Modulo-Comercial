@@ -81,7 +81,7 @@ export function SalesNewView() {
   const executives = useMemo(() => state.executives.filter((item) => item.status === "Activo"), [state.executives]);
   const productTypes = useMemo(() => Array.from(new Set([...productTypeDefaults, ...state.programs.map((program) => program.productType)])), [state.programs]);
   const activePrograms = useMemo(
-    () => state.programs.filter((program) => program.active && (!sale.productType || program.productType === sale.productType)),
+    () => state.programs.filter((program) => isProgramActiveForSales(program) && (!sale.productType || program.productType === sale.productType)),
     [sale.productType, state.programs]
   );
   const activeDiscounts = useMemo(() => state.discounts.filter((discount) => discount.active), [state.discounts]);
@@ -160,6 +160,42 @@ export function SalesNewView() {
     patchSale(patch);
   }
 
+  function selectCatalogProgram(programId: string) {
+    const program = state.programs.find((item) => item.id === programId);
+    if (!program) {
+      patchSale({ productName: "" });
+      return;
+    }
+    const price = calculateProgramPrice(program);
+    patchSale({
+      productId: program.id,
+      productEditionId: program.id,
+      productType: program.productType,
+      productName: program.name,
+      programCode: program.code,
+      modality: program.modality ?? sale.modality,
+      startDate: program.startDate,
+      endDate: program.endDate,
+      duration: program.durationValue ? `${program.durationValue} ${program.durationUnit ?? ""}`.trim() : sale.duration,
+      schedule: program.scheduleSummary,
+      certification: program.certificationType,
+      certifyingInstitution: program.certifyingInstitution,
+      grossAmount: price || sale.grossAmount,
+      paidAmount: price && !sale.paidAmount ? price : sale.paidAmount,
+      officialAmount: price || sale.officialAmount,
+      soldAmount: price || sale.soldAmount,
+      paymentPlan: {
+        ...sale.paymentPlan,
+        enrollmentAmount: program.enrollmentAmount,
+        monthlyAmount: program.monthlyAmount,
+        monthlyCount: program.monthlyCount,
+        certificateAmount: program.certificateAmount,
+        totalProgramAmount: calculateProgramTotal(program) || price
+      },
+      notes: [sale.notes, program.formUrl ? `Formulario del programa: ${program.formUrl}` : ""].filter(Boolean).join("\n")
+    });
+  }
+
   function updateParticipant(key: string, value: string) {
     patchSale({ participant: { ...sale.participant, [key]: value } });
   }
@@ -202,21 +238,21 @@ export function SalesNewView() {
     }
 
     if (kind === "program") {
-      const nextProgram: SalesProgram = {
-        id: `program-${crypto.randomUUID()}`,
-        name,
-        productType: sale.productType,
+      const notification = {
+        id: `notification-${crypto.randomUUID()}`,
+        title: "Solicitud de producto / evento",
+        message: `${sessionProfile?.fullName ?? "Usuario comercial"} solicita crear o activar: ${name}. Tipo sugerido: ${sale.productType}.`,
+        audience: "Jefatura" as const,
+        type: "Comunicado" as const,
         active: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toLocaleString("es-PE"),
+        createdBy: sessionProfile?.fullName ?? "Usuario comercial",
+        readBy: []
       };
-      const exists = state.programs.some((program) => sameText(program.name, name));
-      syncState({
-        ...state,
-        programs: exists ? state.programs : [nextProgram, ...state.programs]
-      });
-      patchSale({ productName: name });
-      persistOption({ kind: "program", name, productType: sale.productType });
-      setStatus(exists ? "Programa encontrado en historial." : "Programa agregado al historial.");
+      const next = { ...state, notifications: [notification, ...state.notifications] };
+      syncState(next);
+      pushNotification(notification);
+      setStatus("Solicitud enviada. Ventas solo puede usar productos activos del catálogo.");
     } else {
       const field = kind === "lead" ? "leadSources" : "paymentMethods";
       const nextOption: CommercialOption = { id: `${kind}-${crypto.randomUUID()}`, label: name, active: true, createdAt: new Date().toISOString() };
@@ -436,10 +472,16 @@ export function SalesNewView() {
           </Field>
           <Field label="Programa / evento">
             <div className="field-inline">
-              <input list="sales-program-history" value={sale.productName} onChange={(event) => update("productName", event.target.value)} placeholder="Buscar o escribir programa" />
-              <button className="icon-button" type="button" onClick={() => { setOptionModal("program"); setOptionDraft(sale.productName); }} title="Agregar programa"><Plus size={16} /></button>
+              <select value={sale.productId ?? ""} onChange={(event) => selectCatalogProgram(event.target.value)}>
+                <option value="">Seleccionar producto activo</option>
+                {activePrograms.map((program) => (
+                  <option key={program.id} value={program.id}>
+                    {program.code ? `${program.code} · ` : ""}{program.name}
+                  </option>
+                ))}
+              </select>
+              <button className="icon-button" type="button" onClick={() => { setOptionModal("program"); setOptionDraft(sale.productName); }} title="Solicitar producto"><Plus size={16} /></button>
             </div>
-            <datalist id="sales-program-history">{activePrograms.map((program) => <option key={program.id} value={program.name} />)}</datalist>
           </Field>
           <Field label="Código del programa"><input value={sale.programCode ?? ""} onChange={(event) => update("programCode", event.target.value)} /></Field>
           <Field label="Modalidad"><select value={sale.modality ?? "Virtual"} onChange={(event) => update("modality", event.target.value)}>{modalityOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
@@ -656,10 +698,30 @@ function renderModalityFields(sale: Sale, onChange: (key: string, value: string 
 }
 
 function optionTitle(kind: OptionModalKind) {
-  if (kind === "program") return "Agregar programa / evento";
+  if (kind === "program") return "Solicitar producto / evento";
   if (kind === "lead") return "Agregar origen del lead";
   if (kind === "payment") return "Agregar medio de pago";
   return "Agregar tipo de producto";
+}
+
+function isProgramActiveForSales(program: SalesProgram) {
+  return program.active || program.status === "Activo para ventas";
+}
+
+function calculateProgramPrice(program: SalesProgram) {
+  const amounts = [program.singlePaymentAmount, program.enrollmentAmount, program.monthlyAmount, program.certificateAmount, program.priceFrom]
+    .map((amount) => Number(amount ?? 0))
+    .filter((amount) => amount > 0);
+  return amounts.length ? Math.min(...amounts) : 0;
+}
+
+function calculateProgramTotal(program: SalesProgram) {
+  const enrollment = Number(program.enrollmentAmount ?? 0);
+  const monthly = Number(program.monthlyAmount ?? 0);
+  const count = Number(program.monthlyCount ?? 0);
+  const certificate = Number(program.certificateAmount ?? 0);
+  const single = Number(program.singlePaymentAmount ?? 0);
+  return single || enrollment + monthly * count + certificate;
 }
 
 function sameText(left: string, right: string) {

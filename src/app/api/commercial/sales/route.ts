@@ -118,6 +118,14 @@ async function resolveProductId(admin: ReturnType<typeof createAdminClient>, pro
 
 function buildSaleNotes(payload: Sale, notePrefix?: string | null) {
   const extended = {
+    productId: payload.productId ?? null,
+    productEditionId: payload.productEditionId ?? null,
+    priceTierId: payload.priceTierId ?? null,
+    programCode: payload.programCode ?? null,
+    officialAmount: payload.officialAmount ?? null,
+    soldAmount: payload.soldAmount ?? null,
+    priceDifference: payload.priceDifference ?? null,
+    priceOverrideReason: payload.priceOverrideReason ?? null,
     participant: payload.participant ?? null,
     modality: payload.modality ?? null,
     attentionChannel: payload.attentionChannel ?? null,

@@ -18,18 +18,43 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { broadcastCommercialDataChange } from "@/lib/commercial/events";
-import { loadLinkedCommercialData, type LinkedCommercialData } from "@/lib/commercial/linked-data";
+import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
+import type { LinkedCommercialData } from "@/lib/commercial/linked-data";
 import { saveCommercialGoal, saveCommercialGoalVersion } from "@/lib/supabase/commercial";
+import type { CommercialState } from "@/lib/commercial/types";
 import type { MonthlyGoal, Sale } from "@/types/sales";
 
 const CURRENT_MONTH = "2026-06";
 const DEFAULT_GOAL = 120000;
 const WEEKDAY_LABELS = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 const DAY_WEIGHTS = [0.4, 1.1, 1.05, 1, 1, 1.15, 0.7];
+const GOAL_CRITERIA_KEY = "reba-goal-criteria-v1";
 
 type ViewScope = "Empresa" | "Equipo" | "Ejecutivo" | "Producto / Curso" | "Canal";
 type GoalStatus = "Borrador" | "Activa" | "Cerrada" | "Recalculada" | "Archivada";
+type GoalScopeDraft = "Empresa" | "Equipo" | "Ejecutivo";
+
+type GoalCriteria = {
+  dayWeights: number[];
+  amountMode: "Monto pagado validado" | "Monto neto vendido";
+  warningThreshold: number;
+  riskThreshold: number;
+};
+
+type TeamGoalDraft = {
+  id: string;
+  name: string;
+  color: string;
+  leaderId?: string;
+  goalAmount: number;
+};
+
+type ExecutiveGoalDraft = {
+  id: string;
+  fullName: string;
+  teamId?: string;
+  goalAmount: number;
+};
 
 type DailyPlan = {
   date: string;
@@ -58,17 +83,30 @@ type WeeklyPlan = {
 
 type GoalMetrics = ReturnType<typeof buildGoalMetrics>;
 
+const DEFAULT_CRITERIA: GoalCriteria = {
+  dayWeights: DAY_WEIGHTS,
+  amountMode: "Monto pagado validado",
+  warningThreshold: 95,
+  riskThreshold: 85
+};
+
 export function CommercialGoalsCenter() {
   const [data, setData] = useState<LinkedCommercialData | null>(null);
+  const [commercialState, setCommercialStateView] = useState<CommercialState>(() => getCommercialState());
   const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
   const [viewScope, setViewScope] = useState<ViewScope>("Empresa");
   const [goalStatus, setGoalStatus] = useState<GoalStatus>("Activa");
+  const [editScope, setEditScope] = useState<GoalScopeDraft>("Empresa");
   const [editOpen, setEditOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [criteriaOpen, setCriteriaOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formGoal, setFormGoal] = useState(DEFAULT_GOAL);
+  const [teamGoals, setTeamGoals] = useState<TeamGoalDraft[]>([]);
+  const [executiveGoals, setExecutiveGoals] = useState<ExecutiveGoalDraft[]>([]);
+  const [criteria, setCriteria] = useState<GoalCriteria>(() => loadGoalCriteria());
+  const [statusMessage, setStatusMessage] = useState("");
   const [changeReason, setChangeReason] = useState("");
 
   useEffect(() => {
@@ -76,14 +114,31 @@ export function CommercialGoalsCenter() {
   }, []);
 
   async function hydrate() {
-    const linkedData = await loadLinkedCommercialData();
+    let current = getCommercialState();
+    try {
+      const response = await fetch("/api/commercial/snapshot", { cache: "no-store" });
+      const payload = (await response.json()) as { ok?: boolean; data?: Partial<CommercialState> };
+      if (response.ok && payload.ok && payload.data) {
+        current = {
+          ...current,
+          teams: Array.isArray(payload.data.teams) ? payload.data.teams : current.teams,
+          executives: Array.isArray(payload.data.executives) ? payload.data.executives : current.executives,
+          sales: Array.isArray(payload.data.sales) ? payload.data.sales : current.sales
+        };
+        setCommercialState(current);
+      }
+    } catch {
+      undefined;
+    }
+    const linkedData = buildLinkedDataFromCommercialState(current, selectedMonth);
+    setCommercialStateView(current);
     setData(linkedData);
-    const companyGoal = findCompanyGoal(linkedData, selectedMonth);
-    const teamGoalTotal = linkedData.teams.reduce((sum, team) => sum + team.monthlyGoal, 0);
-    setFormGoal(companyGoal?.goalAmount ?? (teamGoalTotal || DEFAULT_GOAL));
+    setFormGoal(current.companyGoal || DEFAULT_GOAL);
+    setTeamGoals(current.teams.map((team) => ({ id: team.id, name: team.name, color: team.color, leaderId: team.leaderId, goalAmount: Number(team.goalAmount ?? 0) })));
+    setExecutiveGoals(current.executives.filter((executive) => executive.status === "Activo").map((executive) => ({ id: executive.id, fullName: executive.fullName, teamId: executive.teamId, goalAmount: Number(executive.goalAmount ?? 0) })));
   }
 
-  const metrics = useMemo(() => buildGoalMetrics(data, selectedMonth, formGoal), [data, selectedMonth, formGoal]);
+  const metrics = useMemo(() => buildGoalMetrics(data, selectedMonth, formGoal, criteria), [criteria, data, selectedMonth, formGoal]);
 
   async function saveGoal() {
     if (!data || formGoal <= 0 || !changeReason.trim()) return;
@@ -98,20 +153,45 @@ export function CommercialGoalsCenter() {
       goalPoints: existing?.goalPoints ?? 0
     };
 
-    const nextData = {
-      ...data,
-      monthlyGoals: existing
-        ? data.monthlyGoals.map((goal) => (goal.id === existing.id ? nextGoal : goal))
-        : [...data.monthlyGoals, nextGoal]
+    const nextCommercialState: CommercialState = {
+      ...commercialState,
+      companyGoal: formGoal,
+      teams: commercialState.teams.map((team) => {
+        const draft = teamGoals.find((item) => item.id === team.id);
+        return draft ? { ...team, goalAmount: Math.max(Number(draft.goalAmount ?? 0), 0) } : team;
+      }),
+      executives: commercialState.executives.map((executive) => {
+        const draft = executiveGoals.find((item) => item.id === executive.id);
+        return draft ? { ...executive, goalAmount: Math.max(Number(draft.goalAmount ?? 0), 0) } : executive;
+      }),
+      audit: [
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toLocaleString("es-PE"),
+          actor: "Administrador Comercial",
+          action: "Actualizo metas comerciales",
+          module: "Metas",
+          target: `${selectedMonth} · ${editScope}`,
+          result: "Exitoso",
+          criticality: "Alta",
+          before: money(previousAmount),
+          after: money(formGoal)
+        },
+        ...commercialState.audit
+      ]
     };
-    setData(nextData);
-    broadcastCommercialDataChange();
+    setCommercialState(nextCommercialState);
+    setCommercialStateView(nextCommercialState);
+    setData(buildLinkedDataFromCommercialState(nextCommercialState, selectedMonth));
+    setStatusMessage("Metas guardadas y replicadas en Dashboard, Equipos y Ejecutivos.");
 
     try {
       await saveCommercialGoal(nextGoal);
       await saveCommercialGoalVersion(nextGoal.id, previousAmount, formGoal, changeReason.trim()).catch((error) => {
         console.warn("No se pudo guardar version de meta", error);
       });
+      await persistTeamGoalDrafts(nextCommercialState, teamGoals);
+      await persistExecutiveGoalDrafts(nextCommercialState, executiveGoals);
     } finally {
       setSaving(false);
       setEditOpen(false);
@@ -133,6 +213,24 @@ export function CommercialGoalsCenter() {
       ["Confianza", metrics.confidence]
     ];
     downloadCsv("metas-comerciales.csv", rows);
+  }
+
+  function openGoalEditor(scope: GoalScopeDraft) {
+    setEditScope(scope);
+    setEditOpen(true);
+    setStatusMessage("");
+  }
+
+  function recalculateDistribution() {
+    const company = Math.max(formGoal, 1);
+    const teamBase = commercialState.teams.length ? Math.round(company / commercialState.teams.length) : 0;
+    const executiveBase = commercialState.executives.filter((executive) => executive.status === "Activo").length
+      ? Math.round(company / commercialState.executives.filter((executive) => executive.status === "Activo").length)
+      : 0;
+    setTeamGoals((items) => items.map((item) => ({ ...item, goalAmount: teamBase })));
+    setExecutiveGoals((items) => items.map((item) => ({ ...item, goalAmount: executiveBase })));
+    setGoalStatus("Recalculada");
+    setStatusMessage("Distribucion recalculada. Revisa y guarda para replicar en los demas modulos.");
   }
 
   if (!data) {
@@ -167,9 +265,11 @@ export function CommercialGoalsCenter() {
               <option>Canal</option>
             </select>
           </label>
-          <Button className="goal-edit-button" onClick={() => setEditOpen(true)}><Pencil size={17} /> Editar meta</Button>
+          <Button className="goal-edit-button" onClick={() => openGoalEditor("Empresa")}><Pencil size={17} /> Editar meta</Button>
         </div>
       </section>
+
+      {statusMessage ? <div className="validation-toast goals-status-toast">{statusMessage}</div> : null}
 
       <section className="goal-kpi-grid">
         <GoalKpi label="Meta mensual" value={money(metrics.goalAmount)} helper="Venta neta activa" icon={<Target size={20} />} />
@@ -215,8 +315,8 @@ export function CommercialGoalsCenter() {
       </section>
 
       <section className="goals-action-bar card card-pad">
-        <Button onClick={() => setEditOpen(true)}><Target size={17} /> Crear nueva meta</Button>
-        <Button variant="secondary" onClick={hydrate}><RefreshCw size={17} /> Recalcular distribucion</Button>
+        <Button onClick={() => openGoalEditor("Empresa")}><Target size={17} /> Crear nueva meta</Button>
+        <Button variant="secondary" onClick={recalculateDistribution}><RefreshCw size={17} /> Recalcular distribucion</Button>
         <Button variant="secondary" onClick={() => setImportOpen(true)}><FileSpreadsheet size={17} /> Importar historico</Button>
         <Button variant="secondary" onClick={exportSummary}><Download size={17} /> Exportar reporte</Button>
         <Button variant="secondary" onClick={() => setCriteriaOpen(true)}><Pencil size={17} /> Configurar criterios</Button>
@@ -334,35 +434,50 @@ export function CommercialGoalsCenter() {
 
       <GoalEditModal
         open={editOpen}
+        scope={editScope}
         goalAmount={formGoal}
+        teamGoals={teamGoals}
+        executiveGoals={executiveGoals}
         goalStatus={goalStatus}
         changeReason={changeReason}
         metrics={metrics}
         saving={saving}
+        teams={commercialState.teams}
         onGoalChange={setFormGoal}
+        onTeamGoalsChange={setTeamGoals}
+        onExecutiveGoalsChange={setExecutiveGoals}
+        onScopeChange={setEditScope}
         onStatusChange={setGoalStatus}
         onReasonChange={setChangeReason}
         onClose={() => setEditOpen(false)}
         onSave={saveGoal}
       />
-      <InfoModal
+      <ImportHistoryModal
         open={importOpen}
-        title="Importar historico"
-        description="Flujo preparado para Excel: subir archivo, mapear columnas, validar calidad, previsualizar y confirmar importacion."
+        onImported={(message) => setStatusMessage(message)}
         onClose={() => setImportOpen(false)}
       />
-      <InfoModal
+      <CriteriaModal
         open={criteriaOpen}
-        title="Configuracion de criterios"
-        description="Aqui se configuraran dias laborables, feriados, pesos diarios, pesos semanales, umbrales del semaforo, ticket promedio y reglas de alerta."
+        criteria={criteria}
+        onSave={(next) => {
+          setCriteria(next);
+          saveGoalCriteria(next);
+          setCriteriaOpen(false);
+          setStatusMessage("Criterios actualizados. El pronostico y la distribucion se recalcularon.");
+        }}
         onClose={() => setCriteriaOpen(false)}
       />
-      <ClosePeriodModal open={closeOpen} metrics={metrics} onClose={() => setCloseOpen(false)} />
+      <ClosePeriodModal open={closeOpen} metrics={metrics} onClose={() => setCloseOpen(false)} onConfirm={() => {
+        setGoalStatus("Cerrada");
+        setCloseOpen(false);
+        setStatusMessage("Periodo marcado como cerrado en el modulo. Guarda cambios si deseas consolidarlo como meta cerrada.");
+      }} />
     </div>
   );
 }
 
-function buildGoalMetrics(data: LinkedCommercialData | null, month: string, fallbackGoal: number) {
+function buildGoalMetrics(data: LinkedCommercialData | null, month: string, fallbackGoal: number, criteria: GoalCriteria = DEFAULT_CRITERIA) {
   const goalAmount = Math.max(findCompanyGoal(data, month)?.goalAmount ?? fallbackGoal ?? DEFAULT_GOAL, 1);
   const startDate = `${month}-01`;
   const endDate = getMonthEnd(month);
@@ -374,14 +489,14 @@ function buildGoalMetrics(data: LinkedCommercialData | null, month: string, fall
   const businessDaysRemaining = Math.max(days.filter((day) => day > today && isBusinessDay(day)).length, 1);
   const sales = getValidSalesForMonth(data?.sales ?? [], month);
   const validSalesCount = sales.length;
-  const salesByDate = sumSalesByDate(sales);
-  const accumulated = sales.reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
-  const totalWeight = days.reduce((sum, day) => sum + getDayWeight(day), 0) || 1;
+  const salesByDate = sumSalesByDate(sales, criteria);
+  const accumulated = sales.reduce((sum, sale) => sum + saleAmountForGoal(sale, criteria), 0);
+  const totalWeight = days.reduce((sum, day) => sum + getDayWeight(day, criteria), 0) || 1;
 
   let expectedAccumulated = 0;
   let actualAccumulated = 0;
   const dailyPlan: DailyPlan[] = days.map((day) => {
-    const target = goalAmount * (getDayWeight(day) / totalWeight);
+    const target = goalAmount * (getDayWeight(day, criteria) / totalWeight);
     const actual = salesByDate[day] ?? 0;
     expectedAccumulated += target;
     actualAccumulated += actual;
@@ -390,13 +505,13 @@ function buildGoalMetrics(data: LinkedCommercialData | null, month: string, fall
       date: day,
       dayName: WEEKDAY_LABELS[getDayIndex(day)],
       dayType: inferDayType(day),
-      weight: getDayWeight(day),
+      weight: getDayWeight(day, criteria),
       target,
       actual,
       gap,
       expectedAccumulated,
       actualAccumulated,
-      status: getStatusFromRatio(actual, target)
+      status: getStatusFromRatio(actual, target, criteria)
     };
   });
 
@@ -422,11 +537,11 @@ function buildGoalMetrics(data: LinkedCommercialData | null, month: string, fall
   const complianceStatus = getComplianceStatus(accumulated, goalAmount, progressPct, expectedProgressPct);
   const tone = getTone(complianceStatus);
   const confidence = getConfidence(data, sales);
-  const weeklyPlan = buildWeeklyPlan(dailyPlan);
+  const weeklyPlan = buildWeeklyPlan(dailyPlan, criteria);
   const alerts = buildAlerts({ goalAmount, accumulated, gap, requiredDailySales, expectedToDate, smartForecast, weeklyPlan, dailyPlan, confidence });
   const recommendations = buildRecommendations({ goalAmount, gap, requiredDailySales, smartForecast, currentGap, weeklyPlan, confidence });
-  const teamRanking = buildTeamRanking(data, sales, goalAmount);
-  const executiveRanking = buildExecutiveRanking(data, sales, goalAmount);
+  const teamRanking = buildTeamRanking(data, sales, goalAmount, criteria);
+  const executiveRanking = buildExecutiveRanking(data, sales, goalAmount, criteria);
 
   return {
     goalAmount,
@@ -507,12 +622,19 @@ function RankingPanel({ title, rows }: { title: string; rows: { name: string; go
 
 function GoalEditModal(props: {
   open: boolean;
+  scope: GoalScopeDraft;
   goalAmount: number;
+  teamGoals: TeamGoalDraft[];
+  executiveGoals: ExecutiveGoalDraft[];
   goalStatus: GoalStatus;
   changeReason: string;
   metrics: GoalMetrics;
   saving: boolean;
+  teams: CommercialState["teams"];
   onGoalChange: (value: number) => void;
+  onTeamGoalsChange: (value: TeamGoalDraft[]) => void;
+  onExecutiveGoalsChange: (value: ExecutiveGoalDraft[]) => void;
+  onScopeChange: (value: GoalScopeDraft) => void;
   onStatusChange: (value: GoalStatus) => void;
   onReasonChange: (value: string) => void;
   onClose: () => void;
@@ -523,8 +645,16 @@ function GoalEditModal(props: {
   const projectedGap = Math.max(props.goalAmount - props.metrics.accumulated, 0);
   const variation = props.goalAmount - props.metrics.goalAmount;
   return (
-    <Modal open={props.open} title="Editar meta mensual" description="Define la meta oficial que alimenta Dashboard, ranking, brechas y pronosticos." onClose={props.onClose}>
+    <Modal open={props.open} title="Editar metas comerciales" description="Define metas oficiales para empresa, equipos y ejecutivos. Los cambios alimentan Dashboard, Equipos, Ejecutivos y Ranking." onClose={props.onClose}>
       <div className="goal-edit-modal">
+        <div className="goal-scope-tabs">
+          {(["Empresa", "Equipo", "Ejecutivo"] as GoalScopeDraft[]).map((scope) => (
+            <button key={scope} className={props.scope === scope ? "active" : ""} type="button" onClick={() => props.onScopeChange(scope)}>
+              {scope}
+            </button>
+          ))}
+        </div>
+
         <div className="goal-edit-summary">
           <div>
             <span>Meta actual</span>
@@ -540,55 +670,55 @@ function GoalEditModal(props: {
           </div>
         </div>
 
-        <div className="goals-modal-grid">
-          <label>
-            Periodo
-            <input value="Junio 2026" readOnly />
-          </label>
-          <label>
-            Estado de meta
-            <select value={props.goalStatus} onChange={(event) => props.onStatusChange(event.target.value as GoalStatus)}>
-              <option>Borrador</option>
-              <option>Activa</option>
-              <option>Cerrada</option>
-              <option>Recalculada</option>
-              <option>Archivada</option>
-            </select>
-          </label>
-          <label>
-            Alcance
-            <select defaultValue="Empresa">
-              <option>Empresa</option>
-              <option>Equipo</option>
-              <option>Ejecutivo</option>
-              <option>Producto / Curso</option>
-              <option>Canal</option>
-            </select>
-          </label>
-          <label>
-            Monto que impacta meta
-            <select defaultValue="Monto pagado validado">
-              <option>Monto pagado validado</option>
-              <option>Monto neto vendido</option>
-              <option>Puntos comerciales</option>
-            </select>
-          </label>
-          <label className="wide goal-amount-field">
-            Meta mensual empresa
-            <input type="number" min={1} value={props.goalAmount || ""} onChange={(event) => props.onGoalChange(Number(event.target.value || 0))} autoFocus />
-          </label>
-          <div className="goal-readonly-grid wide">
-            <span>Acumulado actual <strong>{money(props.metrics.accumulated)}</strong></span>
-            <span>Avance con nueva meta <strong>{pct(projectedProgress)}</strong></span>
-            <span>Brecha proyectada <strong>{money(projectedGap)}</strong></span>
-            <span>Venta diaria requerida <strong>{money(props.metrics.requiredDailySales)}</strong></span>
+        {props.scope === "Empresa" ? (
+          <div className="goals-modal-grid">
+            <label>
+              Periodo
+              <input value="Junio 2026" readOnly />
+            </label>
+            <label>
+              Estado de meta
+              <select value={props.goalStatus} onChange={(event) => props.onStatusChange(event.target.value as GoalStatus)}>
+                <option>Borrador</option>
+                <option>Activa</option>
+                <option>Cerrada</option>
+                <option>Recalculada</option>
+                <option>Archivada</option>
+              </select>
+            </label>
+            <label className="wide goal-amount-field">
+              Meta mensual empresa
+              <input type="number" min={1} value={props.goalAmount || ""} onChange={(event) => props.onGoalChange(Number(event.target.value || 0))} autoFocus />
+            </label>
+            <div className="goal-readonly-grid wide">
+              <span>Acumulado actual <strong>{money(props.metrics.accumulated)}</strong></span>
+              <span>Avance con nueva meta <strong>{pct(projectedProgress)}</strong></span>
+              <span>Brecha proyectada <strong>{money(projectedGap)}</strong></span>
+              <span>Venta diaria requerida <strong>{money(props.metrics.requiredDailySales)}</strong></span>
+            </div>
+            <label className="wide">
+              Motivo del cambio
+              <textarea value={props.changeReason} onChange={(event) => props.onReasonChange(event.target.value)} placeholder="Ej. Ajuste por incremento de campañas activas, nuevo objetivo de gerencia o redistribución mensual." />
+              <small>{props.changeReason.trim().length < 6 ? "Es obligatorio registrar un motivo para auditoria." : "El motivo quedara registrado en auditoria."}</small>
+            </label>
           </div>
-          <label className="wide">
-            Motivo del cambio
-            <textarea value={props.changeReason} onChange={(event) => props.onReasonChange(event.target.value)} placeholder="Ej. Ajuste por incremento de campañas activas, nuevo objetivo de gerencia o redistribución mensual." />
-            <small>{props.changeReason.trim().length < 6 ? "Es obligatorio registrar un motivo para auditoria." : "El motivo quedara registrado en auditoria."}</small>
-          </label>
-        </div>
+        ) : null}
+
+        {props.scope === "Equipo" ? (
+          <EditableGoalList
+            title="Metas por equipo"
+            rows={props.teamGoals.map((team) => ({ id: team.id, name: team.name, helper: props.teams.find((item) => item.id === team.id)?.leaderId ? "Con lider asignado" : "Sin lider asignado", goalAmount: team.goalAmount }))}
+            onChange={(id, goalAmount) => props.onTeamGoalsChange(props.teamGoals.map((item) => item.id === id ? { ...item, goalAmount } : item))}
+          />
+        ) : null}
+
+        {props.scope === "Ejecutivo" ? (
+          <EditableGoalList
+            title="Metas por ejecutivo"
+            rows={props.executiveGoals.map((executive) => ({ id: executive.id, name: executive.fullName, helper: props.teams.find((team) => team.id === executive.teamId)?.name ?? "Sin equipo", goalAmount: executive.goalAmount }))}
+            onChange={(id, goalAmount) => props.onExecutiveGoalsChange(props.executiveGoals.map((item) => item.id === id ? { ...item, goalAmount } : item))}
+          />
+        ) : null}
       </div>
       <div className="editor-actions goal-editor-actions">
         <Button variant="secondary" onClick={props.onClose}>Cancelar</Button>
@@ -598,19 +728,100 @@ function GoalEditModal(props: {
   );
 }
 
-function InfoModal({ open, title, description, onClose }: { open: boolean; title: string; description: string; onClose: () => void }) {
+function EditableGoalList({ title, rows, onChange }: { title: string; rows: { id: string; name: string; helper: string; goalAmount: number }[]; onChange: (id: string, goalAmount: number) => void }) {
   return (
-    <Modal open={open} title={title} description={description} onClose={onClose}>
-      <div className="empty-goal-state">
-        <FileSpreadsheet size={28} />
-        <strong>Preparado para siguiente fase</strong>
-        <span>El modulo ya reserva esta accion dentro del flujo operativo de metas.</span>
+    <div className="goal-edit-list">
+      <div className="goals-section-title">
+        <div>
+          <p className="eyebrow">Distribucion</p>
+          <h3>{title}</h3>
+        </div>
+        <span className="muted">Edita y guarda para replicar</span>
+      </div>
+      {rows.map((row) => (
+        <div className="goal-edit-row" key={row.id}>
+          <div>
+            <strong>{row.name}</strong>
+            <span>{row.helper}</span>
+          </div>
+          <input type="number" min={0} value={row.goalAmount || ""} onChange={(event) => onChange(row.id, Number(event.target.value || 0))} />
+        </div>
+      ))}
+      {!rows.length ? <div className="empty-goal-state"><Target size={24} /><strong>No hay registros activos.</strong></div> : null}
+    </div>
+  );
+}
+
+function ImportHistoryModal({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: (message: string) => void }) {
+  const [text, setText] = useState("");
+  const parsedRows = useMemo(() => parseHistoricalRows(text), [text]);
+  return (
+    <Modal open={open} title="Importar historico" description="Pega filas con formato fecha,monto para análisis de referencia. No crea ventas oficiales ni altera ranking." onClose={onClose}>
+      <div className="goal-import-modal">
+        <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder={"2026-06-01,1500\n2026-06-02,2300"} />
+        <div className="goal-readonly-grid">
+          <span>Filas detectadas <strong>{parsedRows.length}</strong></span>
+          <span>Monto referencial <strong>{money(parsedRows.reduce((sum, row) => sum + row.amount, 0))}</strong></span>
+          <span>Estado <strong>{parsedRows.length ? "Listo" : "Pendiente"}</strong></span>
+        </div>
+        <div className="editor-actions">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!parsedRows.length} onClick={() => {
+            window.localStorage.setItem("reba-goal-history-import", JSON.stringify(parsedRows));
+            onImported(`Historico referencial importado: ${parsedRows.length} filas. No impacta ventas oficiales.`);
+            onClose();
+          }}><FileSpreadsheet size={17} /> Guardar historico</Button>
+        </div>
       </div>
     </Modal>
   );
 }
 
-function ClosePeriodModal({ open, metrics, onClose }: { open: boolean; metrics: GoalMetrics; onClose: () => void }) {
+function CriteriaModal({ open, criteria, onClose, onSave }: { open: boolean; criteria: GoalCriteria; onClose: () => void; onSave: (criteria: GoalCriteria) => void }) {
+  const [draft, setDraft] = useState(criteria);
+  useEffect(() => setDraft(criteria), [criteria, open]);
+  return (
+    <Modal open={open} title="Configurar criterios" description="Ajusta pesos por día, modo de monto y umbrales del semáforo comercial." onClose={onClose}>
+      <div className="criteria-modal">
+        <label className="field">
+          <span>Monto que impacta meta</span>
+          <select value={draft.amountMode} onChange={(event) => setDraft({ ...draft, amountMode: event.target.value as GoalCriteria["amountMode"] })}>
+            <option>Monto pagado validado</option>
+            <option>Monto neto vendido</option>
+          </select>
+        </label>
+        <div className="criteria-weight-grid">
+          {WEEKDAY_LABELS.map((day, index) => (
+            <label key={day}>
+              {day}
+              <input type="number" min={0} step={0.05} value={draft.dayWeights[index] ?? 1} onChange={(event) => {
+                const next = [...draft.dayWeights];
+                next[index] = Number(event.target.value || 0);
+                setDraft({ ...draft, dayWeights: next });
+              }} />
+            </label>
+          ))}
+        </div>
+        <div className="goals-modal-grid">
+          <label>
+            Umbral alerta leve (%)
+            <input type="number" min={1} value={draft.warningThreshold} onChange={(event) => setDraft({ ...draft, warningThreshold: Number(event.target.value || 95) })} />
+          </label>
+          <label>
+            Umbral riesgo (%)
+            <input type="number" min={1} value={draft.riskThreshold} onChange={(event) => setDraft({ ...draft, riskThreshold: Number(event.target.value || 85) })} />
+          </label>
+        </div>
+        <div className="editor-actions">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => onSave(draft)}><Save size={17} /> Guardar criterios</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ClosePeriodModal({ open, metrics, onClose, onConfirm }: { open: boolean; metrics: GoalMetrics; onClose: () => void; onConfirm: () => void }) {
   return (
     <Modal open={open} title="Cerrar periodo" description="Antes de cerrar, revisa el resumen que alimentara el historico comercial." onClose={onClose}>
       <div className="close-summary">
@@ -623,10 +834,157 @@ function ClosePeriodModal({ open, metrics, onClose }: { open: boolean; metrics: 
       </div>
       <div className="editor-actions">
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button onClick={onClose}><CheckCircle2 size={17} /> Confirmar cierre</Button>
+        <Button onClick={onConfirm}><CheckCircle2 size={17} /> Confirmar cierre</Button>
       </div>
     </Modal>
   );
+}
+
+function buildLinkedDataFromCommercialState(state: CommercialState, month: string): LinkedCommercialData {
+  const productTypes = Array.from(new Set(state.sales.map((sale) => String(sale.productType || "Curso")))).map((name) => ({
+    id: name,
+    code: productCode(name),
+    name,
+    pointWeight: name === "Diplomado" ? 4 : name === "Curso Modular" ? 2 : 1
+  }));
+
+  return {
+    source: "local",
+    status: "Datos comerciales sincronizados",
+    executives: state.executives.map((executive) => ({
+      id: executive.id,
+      code: executive.code,
+      fullName: executive.fullName,
+      photoUrl: executive.photoUrl ?? "",
+      shift: executive.shift,
+      status: executive.status === "Baja" ? "Inactivo" : executive.status,
+      teamId: executive.teamId ?? "",
+      previousRank: executive.previousRank ?? 99,
+      goalAmount: executive.goalAmount
+    } as any)),
+    teams: state.teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      color: team.color,
+      leaderId: team.leaderId ?? "",
+      monthlyGoal: Number(team.goalAmount ?? 0),
+      active: team.active
+    })),
+    sales: state.sales.map((sale) => ({
+      id: sale.id,
+      saleDate: sale.saleDate,
+      executiveId: sale.executiveId,
+      teamId: sale.teamId ?? "",
+      productTypeId: String(sale.productType || "Curso"),
+      productId: sale.productId ?? "",
+      quantity: sale.quantity,
+      grossAmount: sale.grossAmount,
+      discountAmount: sale.discountAmount,
+      netAmount: sale.netAmount,
+      paidAmount: sale.paidAmount,
+      pendingAmount: sale.pendingAmount,
+      modality: sale.modality,
+      attentionChannel: sale.attentionChannel,
+      paymentConcept: sale.paymentConcept,
+      billingType: sale.billingType,
+      paymentMethod: sale.paymentMethod,
+      leadSource: sale.leadSource,
+      validationStatus: sale.validationStatus,
+      notes: sale.notes
+    } as any)),
+    productTypes: productTypes as any,
+    monthlyGoals: [
+      {
+        id: `goal-company-${month}`,
+        month: `${month}-01`,
+        scope: "company",
+        goalAmount: Number(state.companyGoal ?? DEFAULT_GOAL),
+        goalPoints: 0
+      },
+      ...state.teams.map((team) => ({
+        id: `goal-team-${team.id}-${month}`,
+        month: `${month}-01`,
+        scope: "team" as const,
+        teamId: team.id,
+        goalAmount: Number(team.goalAmount ?? 0),
+        goalPoints: 0
+      })),
+      ...state.executives.map((executive) => ({
+        id: `goal-executive-${executive.id}-${month}`,
+        month: `${month}-01`,
+        scope: "executive" as const,
+        executiveId: executive.id,
+        goalAmount: Number(executive.goalAmount ?? 0),
+        goalPoints: 0
+      }))
+    ]
+  };
+}
+
+function productCode(name: string) {
+  if (name === "Curso Modular") return "CM";
+  if (name === "Diplomado") return "D";
+  if (name === "Taller") return "T";
+  if (name === "Seminario") return "S";
+  return "C";
+}
+
+async function persistTeamGoalDrafts(state: CommercialState, teamGoals: TeamGoalDraft[]) {
+  await Promise.allSettled(teamGoals.map((draft) => {
+    const team = state.teams.find((item) => item.id === draft.id);
+    if (!team) return Promise.resolve();
+    const memberIds = state.executives.filter((executive) => executive.teamId === team.id && executive.status === "Activo").map((executive) => executive.id);
+    return fetch("/api/commercial/teams", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...team, goalAmount: draft.goalAmount, memberIds })
+    });
+  }));
+}
+
+async function persistExecutiveGoalDrafts(state: CommercialState, executiveGoals: ExecutiveGoalDraft[]) {
+  await Promise.allSettled(executiveGoals.map((draft) => {
+    const executive = state.executives.find((item) => item.id === draft.id);
+    if (!executive) return Promise.resolve();
+    return fetch("/api/commercial/executives", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...executive, goalAmount: draft.goalAmount })
+    });
+  }));
+}
+
+function loadGoalCriteria(): GoalCriteria {
+  if (typeof window === "undefined") return DEFAULT_CRITERIA;
+  try {
+    const raw = window.localStorage.getItem(GOAL_CRITERIA_KEY);
+    if (!raw) return DEFAULT_CRITERIA;
+    const parsed = JSON.parse(raw) as Partial<GoalCriteria>;
+    return {
+      ...DEFAULT_CRITERIA,
+      ...parsed,
+      dayWeights: Array.isArray(parsed.dayWeights) && parsed.dayWeights.length === 7 ? parsed.dayWeights.map(Number) : DEFAULT_CRITERIA.dayWeights
+    };
+  } catch {
+    return DEFAULT_CRITERIA;
+  }
+}
+
+function saveGoalCriteria(criteria: GoalCriteria) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(GOAL_CRITERIA_KEY, JSON.stringify(criteria));
+}
+
+function parseHistoricalRows(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [date, amount] = line.split(/[,\t;]/).map((item) => item.trim());
+      return { date, amount: Number(String(amount ?? "").replace("S/", "").replace(",", ".")) };
+    })
+    .filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && Number.isFinite(row.amount) && row.amount > 0);
 }
 
 function findCompanyGoal(data: LinkedCommercialData | null | undefined, month: string) {
@@ -637,19 +995,20 @@ function getValidSalesForMonth(sales: Sale[], month: string) {
   return sales.filter((sale) => sale.validationStatus === "validada" && sale.saleDate.startsWith(month));
 }
 
-function sumSalesByDate(sales: Sale[]) {
+function sumSalesByDate(sales: Sale[], criteria: GoalCriteria = DEFAULT_CRITERIA) {
   return sales.reduce<Record<string, number>>((acc, sale) => {
-    acc[sale.saleDate] = (acc[sale.saleDate] ?? 0) + saleAmountForGoal(sale);
+    acc[sale.saleDate] = (acc[sale.saleDate] ?? 0) + saleAmountForGoal(sale, criteria);
     return acc;
   }, {});
 }
 
-function saleAmountForGoal(sale: Sale) {
+function saleAmountForGoal(sale: Sale, criteria: GoalCriteria = DEFAULT_CRITERIA) {
   const paidAmount = Number((sale as Sale & { paidAmount?: number }).paidAmount ?? 0);
+  if (criteria.amountMode === "Monto neto vendido") return Number(sale.netAmount ?? 0);
   return paidAmount > 0 ? paidAmount : Number(sale.netAmount ?? 0);
 }
 
-function buildWeeklyPlan(dailyPlan: DailyPlan[]): WeeklyPlan[] {
+function buildWeeklyPlan(dailyPlan: DailyPlan[], criteria: GoalCriteria = DEFAULT_CRITERIA): WeeklyPlan[] {
   const weeks: DailyPlan[][] = [];
   dailyPlan.forEach((day, index) => {
     const weekIndex = Math.floor(index / 7);
@@ -670,7 +1029,7 @@ function buildWeeklyPlan(dailyPlan: DailyPlan[]): WeeklyPlan[] {
       actual,
       gap,
       requiredToClose: Math.max(target - actual, 0),
-      status: getStatusFromRatio(actual, target)
+      status: getStatusFromRatio(actual, target, criteria)
     };
   });
 }
@@ -754,24 +1113,24 @@ function buildRecommendations(input: { goalAmount: number; gap: number; required
   return recommendations;
 }
 
-function buildTeamRanking(data: LinkedCommercialData | null, sales: Sale[], goalAmount: number) {
+function buildTeamRanking(data: LinkedCommercialData | null, sales: Sale[], goalAmount: number, criteria: GoalCriteria = DEFAULT_CRITERIA) {
   if (!data) return [];
   return data.teams.map((team) => {
-    const actual = sales.filter((sale) => sale.teamId === team.id).reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
+    const actual = sales.filter((sale) => sale.teamId === team.id).reduce((sum, sale) => sum + saleAmountForGoal(sale, criteria), 0);
     const goal = team.monthlyGoal || goalAmount / Math.max(data.teams.length, 1);
     const progress = goal ? (actual / goal) * 100 : 0;
-    return { name: team.name, goal, actual, progress, gap: actual - goal, status: getStatusFromRatio(actual, goal) };
+    return { name: team.name, goal, actual, progress, gap: actual - goal, status: getStatusFromRatio(actual, goal, criteria) };
   }).sort((a, b) => b.progress - a.progress).slice(0, 6);
 }
 
-function buildExecutiveRanking(data: LinkedCommercialData | null, sales: Sale[], goalAmount: number) {
+function buildExecutiveRanking(data: LinkedCommercialData | null, sales: Sale[], goalAmount: number, criteria: GoalCriteria = DEFAULT_CRITERIA) {
   if (!data) return [];
   return data.executives.map((executive) => {
-    const actual = sales.filter((sale) => sale.executiveId === executive.id).reduce((sum, sale) => sum + saleAmountForGoal(sale), 0);
+    const actual = sales.filter((sale) => sale.executiveId === executive.id).reduce((sum, sale) => sum + saleAmountForGoal(sale, criteria), 0);
     const executiveGoal = (executive as { goalAmount?: number }).goalAmount ?? 0;
     const goal = executiveGoal || goalAmount / Math.max(data.executives.length, 1);
     const progress = goal ? (actual / goal) * 100 : 0;
-    return { name: executive.fullName, goal, actual, progress, gap: actual - goal, status: getStatusFromRatio(actual, goal) };
+    return { name: executive.fullName, goal, actual, progress, gap: actual - goal, status: getStatusFromRatio(actual, goal, criteria) };
   }).sort((a, b) => b.progress - a.progress).slice(0, 6);
 }
 
@@ -784,12 +1143,12 @@ function getComplianceStatus(accumulated: number, goalAmount: number, progressPc
   return "Critico";
 }
 
-function getStatusFromRatio(actual: number, target: number) {
+function getStatusFromRatio(actual: number, target: number, criteria: GoalCriteria = DEFAULT_CRITERIA) {
   if (target <= 0) return "Sin meta";
   const ratio = actual / target;
   if (ratio >= 1) return "En ritmo";
-  if (ratio >= 0.95) return "Leve retraso";
-  if (ratio >= 0.85) return "En riesgo";
+  if (ratio >= criteria.warningThreshold / 100) return "Leve retraso";
+  if (ratio >= criteria.riskThreshold / 100) return "En riesgo";
   return "Critico";
 }
 
@@ -855,8 +1214,8 @@ function getDayIndex(date: string) {
   return parseDate(date).getDay();
 }
 
-function getDayWeight(date: string) {
-  return DAY_WEIGHTS[getDayIndex(date)];
+function getDayWeight(date: string, criteria: GoalCriteria = DEFAULT_CRITERIA) {
+  return criteria.dayWeights[getDayIndex(date)] ?? DAY_WEIGHTS[getDayIndex(date)] ?? 1;
 }
 
 function isBusinessDay(date: string) {

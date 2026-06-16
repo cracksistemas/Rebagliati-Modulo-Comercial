@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, Download, Link2, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Download, Link2, PackageOpen, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getCommercialState, getValidatedSales, money } from "@/lib/commercial/store";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
@@ -18,6 +18,11 @@ function rankExecutives(state: CommercialState) {
   return [...state.executives]
     .filter((item) => item.status === "Activo")
     .sort((a, b) => b.points - a.points || b.currentSales - a.currentSales);
+}
+
+function hasProgramPrice(program: CommercialState["programs"][number]) {
+  return [program.priceFrom, program.singlePaymentAmount, program.enrollmentAmount, program.monthlyAmount, program.certificateAmount]
+    .some((amount) => Number(amount ?? 0) > 0);
 }
 
 type KommoResponseMetric = {
@@ -148,6 +153,12 @@ export function DashboardView() {
     });
     return { total: state.incidents.length, graves, pendientes, criticalExecutive: criticalExecutive?.fullName ?? "Sin criticos" };
   }, [state.executives, state.incidents]);
+  const productSummary = useMemo(() => {
+    const active = state.programs.filter((program) => program.active || program.status === "Activo para ventas");
+    const incomplete = active.filter((program) => !program.modality || !program.startDate || !program.certifyingInstitution || !hasProgramPrice(program)).length;
+    const withoutForm = active.filter((program) => !program.formUrl).length;
+    return { active: active.length, incomplete, withoutForm };
+  }, [state.programs]);
 
   return (
     <div className="grid" style={{ gap: 18 }}>
@@ -226,6 +237,7 @@ export function DashboardView() {
           <p className="badge"><AlertTriangle size={16} /> {metrics.pending} ventas pendientes</p>
           <p className="badge"><Link2 size={16} /> CRM: {kommoMetric?.connected ? "Mensajes sincronizados" : "Pendiente"}</p>
           <p className="badge"><AlertTriangle size={16} /> {incidentSummary.total} incidencias del mes</p>
+          <p className="badge"><PackageOpen size={16} /> {productSummary.active} productos activos · {productSummary.incomplete} incompletos</p>
           <p className="muted">Las ventas pendientes no impactan el ranking oficial hasta validarse.</p>
         </div>
         <div className="card">

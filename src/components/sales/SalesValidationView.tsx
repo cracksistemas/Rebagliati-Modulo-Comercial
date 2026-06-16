@@ -177,7 +177,7 @@ export function SalesValidationView() {
 
   const sales = useMemo(
     () =>
-      [...state.sales].sort((a, b) => {
+      [...state.sales].filter((sale) => !isRetiredJuneRankingImport(sale)).sort((a, b) => {
         const statusPriority = getStatusPriority(a.validationStatus) - getStatusPriority(b.validationStatus);
         return statusPriority || b.saleDate.localeCompare(a.saleDate);
       }),
@@ -351,6 +351,43 @@ export function SalesValidationView() {
 
     next.netAmount = Math.max(Number(next.grossAmount ?? 0) - Number(next.discountAmount ?? 0), 0);
     setEditingSale(next);
+  }
+
+  function applyCatalogProgramToDraft(programName: string) {
+    if (!editingSale) return;
+    const program = state.programs.find((item) => sameText(item.name, programName));
+    if (!program) {
+      updateDraft("productName", programName);
+      return;
+    }
+    const price = calculateProgramPrice(program);
+    const updated: Sale = {
+      ...editingSale,
+      productId: program.id,
+      productEditionId: program.id,
+      productType: program.productType,
+      productName: program.name,
+      programCode: program.code,
+      modality: program.modality ?? editingSale.modality,
+      startDate: program.startDate,
+      endDate: program.endDate,
+      duration: program.durationValue ? `${program.durationValue} ${program.durationUnit ?? ""}`.trim() : editingSale.duration,
+      schedule: program.scheduleSummary,
+      certification: program.certificationType,
+      certifyingInstitution: program.certifyingInstitution,
+      officialAmount: price || editingSale.officialAmount,
+      grossAmount: price || editingSale.grossAmount,
+      paymentPlan: {
+        ...editingSale.paymentPlan,
+        enrollmentAmount: program.enrollmentAmount,
+        monthlyAmount: program.monthlyAmount,
+        monthlyCount: program.monthlyCount,
+        certificateAmount: program.certificateAmount,
+        totalProgramAmount: calculateProgramTotal(program) || price
+      }
+    };
+    updated.netAmount = Math.max(Number(updated.grossAmount ?? 0) - Number(updated.discountAmount ?? 0), 0);
+    setEditingSale(updated);
   }
 
   function upsertEditOption(kind: EditOptionKind, name: string, meta?: { amount?: number; discountType?: "amount" | "percent" }) {
@@ -533,6 +570,7 @@ export function SalesValidationView() {
         leadSources={state.leadSources}
         errors={draftErrors}
         onChange={updateDraft}
+        onProgramSelect={applyCatalogProgramToDraft}
         onOptionUpdate={upsertEditOption}
         onClose={requestCloseEdit}
         onSave={saveEditedSale}
@@ -612,6 +650,7 @@ function EditSaleModal({
   leadSources,
   errors,
   onChange,
+  onProgramSelect,
   onOptionUpdate,
   onClose,
   onSave
@@ -627,6 +666,7 @@ function EditSaleModal({
   leadSources: ReturnType<typeof getCommercialState>["leadSources"];
   errors: ValidationErrors;
   onChange: <K extends keyof Sale>(key: K, value: Sale[K]) => void;
+  onProgramSelect: (programName: string) => void;
   onOptionUpdate: (kind: EditOptionKind, name: string, meta?: { amount?: number; discountType?: "amount" | "percent" }) => void;
   onClose: () => void;
   onSave: () => void;
@@ -637,7 +677,7 @@ function EditSaleModal({
   const [discountTypeDraft, setDiscountTypeDraft] = useState<"amount" | "percent">("amount");
   if (!sale) return null;
   const saveDisabled = saving || Object.keys(errors).length > 0;
-  const activePrograms = programs.filter((item) => item.active && item.productType === sale.productType);
+  const activePrograms = programs.filter((item) => isProgramActiveForSales(item) && item.productType === sale.productType);
   const programOptions = uniqueStrings([sale.productName, ...activePrograms.map((item) => item.name)]);
   const paymentOptions = uniqueStrings([sale.paymentMethod, ...paymentMethods.filter((item) => item.active).map((item) => item.label)]);
   const leadOptions = uniqueStrings([sale.leadSource, ...leadSources.filter((item) => item.active).map((item) => item.label)]);
@@ -706,7 +746,7 @@ function EditSaleModal({
           </Field>
           <Field label="Programa / evento" error={errors.productName}>
             <div className="field-inline option-inline">
-              <select className={errors.productName ? "invalid-field" : ""} value={sale.productName} onChange={(event) => onChange("productName", event.target.value)}>
+              <select className={errors.productName ? "invalid-field" : ""} value={sale.productName} onChange={(event) => onProgramSelect(event.target.value)}>
                 <option value="">Seleccionar programa</option>
                 {programOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
@@ -954,4 +994,29 @@ function normalizeSearch(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function isRetiredJuneRankingImport(sale: Sale & { sourceKey?: string }) {
+  const marker = `${sale.sourceKey ?? ""} ${sale.productName ?? ""} ${sale.notes ?? ""}`.toLowerCase();
+  return marker.includes("ranking-junio-2026-mtd") || marker.includes("carga historica acumulada junio 2026 desde ranking");
+}
+
+function isProgramActiveForSales(program: SalesProgram) {
+  return program.active || program.status === "Activo para ventas";
+}
+
+function calculateProgramPrice(program: SalesProgram) {
+  const amounts = [program.singlePaymentAmount, program.enrollmentAmount, program.monthlyAmount, program.certificateAmount, program.priceFrom]
+    .map((amount) => Number(amount ?? 0))
+    .filter((amount) => amount > 0);
+  return amounts.length ? Math.min(...amounts) : 0;
+}
+
+function calculateProgramTotal(program: SalesProgram) {
+  const enrollment = Number(program.enrollmentAmount ?? 0);
+  const monthly = Number(program.monthlyAmount ?? 0);
+  const count = Number(program.monthlyCount ?? 0);
+  const certificate = Number(program.certificateAmount ?? 0);
+  const single = Number(program.singlePaymentAmount ?? 0);
+  return single || enrollment + monthly * count + certificate;
 }

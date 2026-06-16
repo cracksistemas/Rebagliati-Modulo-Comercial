@@ -14,6 +14,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  PackageOpen,
   Plus,
   Settings,
   Target,
@@ -36,6 +37,7 @@ type SessionHeaderProfile = {
 const navItems = [
   { href: "/dashboard", label: "Resumen mensual", icon: LayoutDashboard, permission: "dashboard.resumen" },
   { href: "/sales/new", label: "Registrar venta", icon: CircleDollarSign, permission: "sales.new" },
+  { href: "/products", label: "Productos y Eventos", icon: PackageOpen, permission: "products.view" },
   { href: "/ranking", label: "Ranking de ejecutivos", icon: Trophy, permission: "ranking.executives" },
   { href: "/teams", label: "Ventas por equipo", icon: UsersRound, permission: "teams.view" },
   { href: "/executives", label: "Ejecutivos", icon: Flag, permission: "executives.manage" },
@@ -60,6 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.includes("executives")) return "Directorio comercial";
     if (pathname.includes("incidents")) return "Incidencias";
     if (pathname.includes("training")) return "Academia Comercial";
+    if (pathname.includes("products")) return "Productos y Eventos";
     if (pathname.includes("teams")) return "Ventas por equipo";
     if (pathname.includes("ranking")) return "Ranking de ejecutivos";
     if (pathname.includes("sales")) return "Control de ventas";
@@ -104,6 +107,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
+  useEffect(() => {
+    if (pathname === "/login") return;
+    let mounted = true;
+    fetch("/api/commercial/options", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!mounted || !payload?.ok || !payload.data) return;
+        const current = getCommercialState();
+        const next = {
+          ...current,
+          programs: Array.isArray(payload.data.programs) ? payload.data.programs : current.programs,
+          discounts: Array.isArray(payload.data.discounts) ? payload.data.discounts : current.discounts,
+          leadSources: Array.isArray(payload.data.leadSources) ? payload.data.leadSources : current.leadSources,
+          paymentMethods: Array.isArray(payload.data.paymentMethods) ? payload.data.paymentMethods : current.paymentMethods
+        };
+        setCommercialState(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
+
   const visibleNavItems = useMemo(() => {
     const role = profile?.role.toLowerCase() ?? "";
     if (role.includes("super") || role.includes("admin_sistema")) return navItems;
@@ -113,16 +139,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     if (role.includes("ejecutivo") && !role.includes("lider")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/sales/new", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/sales/new", "/products", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
       );
     }
     if (role.includes("marketing") || role.includes("solo lectura") || role.includes("marketing_soporte")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/products", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
       );
     }
     return navItems;
-  }, [profile?.role]);
+  }, [profile?.permissions, profile?.role]);
 
   if (pathname === "/login") {
     return <>{children}</>;

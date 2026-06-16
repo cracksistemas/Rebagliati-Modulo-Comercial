@@ -35,6 +35,11 @@ function cleanSaleNotes(notes?: string | null) {
   return notes.split("__reba_sale_payload__")[0]?.trim() || undefined;
 }
 
+function isRetiredJuneRankingImport(sale: { source_key?: string | null; notes?: string | null }) {
+  const marker = `${sale.source_key ?? ""} ${sale.notes ?? ""}`.toLowerCase();
+  return marker.includes("ranking-junio-2026-mtd") || marker.includes("carga historica acumulada junio 2026 desde ranking");
+}
+
 async function signedExecutivePhoto(admin: ReturnType<typeof createAdminClient>, value?: string | null) {
   if (!value) return undefined;
   if (value.startsWith("http") || value.startsWith("/") || value.startsWith("data:image/")) return value;
@@ -60,7 +65,7 @@ export async function GET() {
       admin.from("team_members").select("team_id,executive_id,active").eq("active", true),
       admin
         .from("sales")
-        .select("id,sale_date,executive_id,team_id,quantity,gross_amount,discount_amount,net_amount,payment_method,lead_source,validation_status,notes,product_types(code,name,point_weight),products(name)")
+        .select("id,sale_date,executive_id,team_id,quantity,gross_amount,discount_amount,net_amount,payment_method,lead_source,validation_status,notes,source_key,product_types(code,name,point_weight),products(name)")
         .order("sale_date", { ascending: false })
     ]);
 
@@ -71,7 +76,7 @@ export async function GET() {
 
     const memberships = (membershipsResult.data as any[]) ?? [];
     const teamByExecutive = new Map(memberships.map((item) => [item.executive_id, item.team_id]));
-    const sales = ((salesResult.data as any[]) ?? []).map((sale) => {
+    const sales = ((salesResult.data as any[]) ?? []).filter((sale) => !isRetiredJuneRankingImport(sale)).map((sale) => {
       const typeCode = sale.product_types?.code ?? "C";
       const extended = parseExtendedSalePayload(sale.notes);
       return {
@@ -79,8 +84,12 @@ export async function GET() {
         saleDate: sale.sale_date,
         executiveId: sale.executive_id,
         teamId: sale.team_id,
+        productId: extended.productId,
+        productEditionId: extended.productEditionId,
+        priceTierId: extended.priceTierId,
         productType: productTypeName(typeCode, sale.product_types?.name),
         productName: sale.products?.name ?? sale.notes ?? "Carga historica ranking Junio 2026",
+        programCode: extended.programCode,
         modality: extended.modality ?? sale.products?.modality,
         attentionChannel: extended.attentionChannel,
         quantity: Number(sale.quantity ?? 0),
@@ -98,6 +107,10 @@ export async function GET() {
         operationDate: extended.operationDate,
         operationTime: extended.operationTime,
         paymentStatus: extended.paymentStatus,
+        officialAmount: extended.officialAmount,
+        soldAmount: extended.soldAmount,
+        priceDifference: extended.priceDifference,
+        priceOverrideReason: extended.priceOverrideReason,
         participant: extended.participant,
         paymentPlan: extended.paymentPlan,
         modalityDetails: extended.modalityDetails,
@@ -106,6 +119,7 @@ export async function GET() {
         leadSource: sale.lead_source ?? "Importacion",
         validationStatus: sale.validation_status ?? "pendiente_validacion",
         notes: cleanSaleNotes(sale.notes),
+        sourceKey: sale.source_key,
         pointWeight: Number(sale.product_types?.point_weight ?? 1)
       };
     });

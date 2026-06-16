@@ -392,6 +392,110 @@
   justify-content: flex-end;
 }
 
+.goals-status-toast {
+  width: fit-content;
+  margin-top: -4px;
+}
+
+.goal-scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(245, 245, 247, 0.92);
+  width: fit-content;
+}
+
+.goal-scope-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.goal-scope-tabs button.active {
+  background: var(--reba-accent);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(0, 167, 235, 0.2);
+}
+
+.goal-edit-list {
+  display: grid;
+  gap: 12px;
+}
+
+.goal-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(245, 245, 247, 0.72);
+}
+
+.goal-edit-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.goal-edit-row span {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.goal-edit-row input,
+.goal-import-modal textarea,
+.criteria-modal input,
+.criteria-modal select {
+  min-height: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fbfbfd;
+  color: var(--text-main);
+  font: inherit;
+}
+
+.goal-edit-row input {
+  text-align: right;
+  font-weight: 900;
+}
+
+.goal-import-modal,
+.criteria-modal {
+  display: grid;
+  gap: 16px;
+}
+
+.goal-import-modal textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.criteria-weight-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.criteria-weight-grid label,
+.criteria-modal .field {
+  display: grid;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .goals-modal-grid .wide {
   grid-column: 1 / -1;
 }
@@ -464,7 +568,9 @@
   .goals-modal-grid,
   .goal-edit-summary,
   .goal-readonly-grid,
-  .close-summary {
+  .close-summary,
+  .criteria-weight-grid,
+  .goal-edit-row {
     grid-template-columns: 1fr;
   }
 
