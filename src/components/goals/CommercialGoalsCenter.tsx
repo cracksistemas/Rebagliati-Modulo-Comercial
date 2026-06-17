@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Save,
   Target,
-  TrendingUp
+  TrendingUp,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -643,31 +644,57 @@ function GoalEditModal(props: {
   const canSave = props.goalAmount > 0 && props.changeReason.trim().length >= 6 && !props.saving;
   const projectedProgress = props.goalAmount ? (props.metrics.accumulated / props.goalAmount) * 100 : 0;
   const projectedGap = Math.max(props.goalAmount - props.metrics.accumulated, 0);
+  const projectedDailyRequired = projectedGap / Math.max(props.metrics.remainingDays, 1);
   const variation = props.goalAmount - props.metrics.goalAmount;
+  const variationTone = variation > 0 ? "is-watch" : variation < 0 ? "is-good" : "is-neutral";
+  const statusToneClass = props.goalStatus.toLowerCase().replace(/\s+/g, "-");
+  const footerMessage = canSave
+    ? "Todo cambio quedara auditado y replicado en el sistema comercial."
+    : "Complete una meta valida y un motivo de al menos 6 caracteres.";
   return (
-    <Modal open={props.open} title="Editar metas comerciales" description="Define metas oficiales para empresa, equipos y ejecutivos. Los cambios alimentan Dashboard, Equipos, Ejecutivos y Ranking." onClose={props.onClose}>
-      <div className="goal-edit-modal">
-        <div className="goal-scope-tabs">
+    <Modal open={props.open} title="Editar metas comerciales" onClose={props.onClose} hideHeader variant="executive">
+      <div className="goal-modal-v2">
+        <header className="goal-modal-v2__header">
+          <div>
+            <p className="goal-modal-v2__eyebrow">Accion comercial</p>
+            <h2>Editar metas comerciales</h2>
+            <p>Define metas oficiales para empresa, equipos y ejecutivos. Los cambios alimentan Dashboard, Equipos, Ejecutivos y Ranking.</p>
+          </div>
+          <div className="goal-modal-v2__header-actions">
+            <div className="goal-modal-v2__chips" aria-label="Contexto de meta">
+              <span>Junio 2026</span>
+              <span className={`goal-modal-v2__status goal-status-${statusToneClass}`}>{props.goalStatus}</span>
+            </div>
+            <button className="goal-modal-v2__close" type="button" onClick={props.onClose} aria-label="Cerrar modal">
+              <X size={18} />
+            </button>
+          </div>
+        </header>
+
+        <div className="goal-modal-v2__segmented" role="tablist" aria-label="Alcance de metas">
           {(["Empresa", "Equipo", "Ejecutivo"] as GoalScopeDraft[]).map((scope) => (
-            <button key={scope} className={props.scope === scope ? "active" : ""} type="button" onClick={() => props.onScopeChange(scope)}>
+            <button key={scope} className={props.scope === scope ? "is-active" : ""} type="button" role="tab" aria-selected={props.scope === scope} onClick={() => props.onScopeChange(scope)}>
               {scope}
             </button>
           ))}
         </div>
 
-        <div className="goal-edit-summary">
-          <div>
+        <div className="goal-modal-v2__summary">
+          <article className="summary-card">
             <span>Meta actual</span>
             <strong>{money(props.metrics.goalAmount)}</strong>
-          </div>
-          <div>
+            <small>Objetivo oficial vigente</small>
+          </article>
+          <article className="summary-card summary-card-accent">
             <span>Nueva meta</span>
             <strong>{money(props.goalAmount)}</strong>
-          </div>
-          <div className={variation >= 0 ? "is-watch" : "is-good"}>
+            <small>Se aplicara al guardar</small>
+          </article>
+          <article className={`summary-card ${variationTone}`}>
             <span>Variacion</span>
             <strong>{variation >= 0 ? "+" : ""}{money(variation)}</strong>
-          </div>
+            <small>{variation === 0 ? "Sin cambio frente a la meta actual" : "Diferencia contra objetivo vigente"}</small>
+          </article>
         </div>
 
         {props.scope === "Empresa" ? (
@@ -719,16 +746,20 @@ function GoalEditModal(props: {
             onChange={(id, goalAmount) => props.onExecutiveGoalsChange(props.executiveGoals.map((item) => item.id === id ? { ...item, goalAmount } : item))}
           />
         ) : null}
-      </div>
-      <div className="editor-actions goal-editor-actions">
-        <Button variant="secondary" onClick={props.onClose}>Cancelar</Button>
-        <Button disabled={!canSave} onClick={props.onSave}><Save size={17} /> {props.saving ? "Guardando..." : "Guardar meta"}</Button>
+        <footer className="goal-modal-v2__footer">
+          <p className={canSave ? "is-ready" : "is-pending"}>{footerMessage}</p>
+          <div className="goal-modal-v2__actions">
+            <Button variant="secondary" onClick={props.onClose}>Cancelar</Button>
+            <Button disabled={!canSave} onClick={props.onSave}><Save size={17} /> {props.saving ? "Guardando..." : "Guardar meta"}</Button>
+          </div>
+        </footer>
       </div>
     </Modal>
   );
 }
 
 function EditableGoalList({ title, rows, onChange }: { title: string; rows: { id: string; name: string; helper: string; goalAmount: number }[]; onChange: (id: string, goalAmount: number) => void }) {
+  const totalGoal = rows.reduce((sum, row) => sum + Math.max(Number(row.goalAmount ?? 0), 0), 0) || 1;
   return (
     <div className="goal-edit-list">
       <div className="goals-section-title">
@@ -743,8 +774,12 @@ function EditableGoalList({ title, rows, onChange }: { title: string; rows: { id
           <div>
             <strong>{row.name}</strong>
             <span>{row.helper}</span>
+            <i aria-hidden="true"><b style={{ width: `${Math.min((Math.max(Number(row.goalAmount ?? 0), 0) / totalGoal) * 100, 100)}%` }} /></i>
           </div>
-          <input type="number" min={0} value={row.goalAmount || ""} onChange={(event) => onChange(row.id, Number(event.target.value || 0))} />
+          <label>
+            <span>Meta</span>
+            <input type="number" min={0} value={row.goalAmount || ""} onChange={(event) => onChange(row.id, Number(event.target.value || 0))} />
+          </label>
         </div>
       ))}
       {!rows.length ? <div className="empty-goal-state"><Target size={24} /><strong>No hay registros activos.</strong></div> : null}

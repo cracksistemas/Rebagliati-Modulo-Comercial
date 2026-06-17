@@ -42,9 +42,26 @@ function isRetiredJuneRankingImport(sale: { source_key?: string | null; notes?: 
 
 async function signedExecutivePhoto(admin: ReturnType<typeof createAdminClient>, value?: string | null) {
   if (!value) return undefined;
-  if (value.startsWith("http") || value.startsWith("/") || value.startsWith("data:image/")) return value;
-  const { data, error } = await admin.storage.from("executive-photos").createSignedUrl(value, 60 * 60 * 24);
+  if (value.startsWith("/") || value.startsWith("data:image/")) return value;
+  const path = value.startsWith("http") ? extractExecutivePhotoPath(value) : value;
+  if (!path) return value.startsWith("http") ? value : undefined;
+  const { data, error } = await admin.storage.from("executive-photos").createSignedUrl(path, 60 * 60 * 24);
   return error ? undefined : data.signedUrl;
+}
+
+function extractExecutivePhotoPath(photoUrl: string) {
+  try {
+    const url = new URL(photoUrl);
+    const markers = [
+      "/storage/v1/object/public/executive-photos/",
+      "/storage/v1/object/sign/executive-photos/"
+    ];
+    const marker = markers.find((item) => url.pathname.includes(item));
+    if (!marker) return null;
+    return decodeURIComponent(url.pathname.split(marker)[1] ?? "").split("?")[0];
+  } catch {
+    return null;
+  }
 }
 
 export async function GET() {

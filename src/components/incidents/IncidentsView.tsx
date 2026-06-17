@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Plus, Ro
 import { useMemo, useState } from "react";
 import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
 import type { Incident, IncidentSeverity, IncidentStatus } from "@/lib/commercial/types";
+import { Avatar } from "@/components/ui/Avatar";
 
 function nextIncidentCode(total: number) {
   return `INC-2026-${String(total + 1).padStart(4, "0")}`;
@@ -239,7 +240,7 @@ export function IncidentsView() {
           <div className="grid">
             {executiveSummary.map((item) => (
               <div key={item.executive.id} style={{ display: "flex", gap: 12, alignItems: "center", borderBottom: "1px solid #E5E5EA", paddingBottom: 10 }}>
-                {item.executive.photoUrl ? <img className="avatar" src={item.executive.photoUrl} alt={item.executive.fullName} /> : <span className="avatar">{item.executive.fullName.slice(0, 2).toUpperCase()}</span>}
+                <Avatar src={item.executive.photoUrl} name={item.executive.fullName} />
                 <div style={{ flex: 1 }}>
                   <strong>{item.executive.fullName}</strong>
                   <p className="muted">{item.total} incidencias - {item.category}</p>

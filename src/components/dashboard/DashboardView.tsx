@@ -5,14 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getCommercialState, getValidatedSales, money } from "@/lib/commercial/store";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import type { CommercialState, Executive } from "@/lib/commercial/types";
-
-function initials(name: string) {
-  return (name || "NA")
-    .split(" ")
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("");
-}
+import { Avatar } from "@/components/ui/Avatar";
 
 function rankExecutives(state: CommercialState) {
   return [...state.executives]
@@ -79,7 +72,9 @@ function BattleCard({ leaders, total }: { leaders: Executive[]; total: number })
               const pct = Number.isFinite(index === 0 ? firstPercent : secondPercent) ? (index === 0 ? firstPercent : secondPercent) : 0;
           return (
             <div key={item.id} style={{ flex: 1, textAlign: "center" }}>
-              {item.photoUrl ? <img className="avatar" src={item.photoUrl} alt={item.fullName} style={{ width: 92, height: 92, margin: "0 auto 12px" }} /> : <div className="avatar" style={{ width: 92, height: 92, margin: "0 auto 12px" }}>{initials(item.fullName)}</div>}
+              <div style={{ width: 92, height: 92, margin: "0 auto 12px" }}>
+                <Avatar src={item.photoUrl} name={item.fullName} size="xl" />
+              </div>
               <div style={{ fontSize: "2.3rem", fontWeight: 950, color: index === 0 ? "#01017B" : "#00A7EB" }}>{pct.toFixed(3)}%</div>
               <h3 style={{ marginBottom: 4 }}>{item.fullName}</h3>
               <p className="muted">{item.points} puntos · {money(item.currentSales)}</p>
@@ -191,7 +186,7 @@ export function DashboardView() {
               return (
                 <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <strong style={{ width: 34 }}>#{index + 1}</strong>
-                  {item.photoUrl ? <img className="avatar" src={item.photoUrl} alt={item.fullName} /> : <div className="avatar">{initials(item.fullName)}</div>}
+                  <Avatar src={item.photoUrl} name={item.fullName} />
                   <div style={{ flex: 1 }}>
                     <strong>{item.fullName}</strong>
                     <div className="muted">{state.teams.find((team) => team.id === item.teamId)?.name ?? "Sin equipo"}</div>

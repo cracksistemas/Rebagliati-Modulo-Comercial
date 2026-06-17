@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, setCommercialState, deactivateExecutive } from "@/lib/commercial/store";
 import type { Executive, UserProfile } from "@/lib/commercial/types";
+import { Avatar } from "@/components/ui/Avatar";
 
 const roles = ["Ejecutivo", "Lider de ventas", "Jefe de ventas", "Gerencia", "Administrador", "Superadministrador", "Marketing"];
 
@@ -21,10 +22,6 @@ type MergeResult = {
   mergedIds: string[];
   mergedNames: string[];
 };
-
-function initials(name: string) {
-  return name.split(" ").slice(0, 2).map((part) => part[0]).join("");
-}
 
 const emptyExecutive: Executive = {
   id: "",
@@ -278,7 +275,7 @@ export function ExecutiveManagement() {
             <tr key={item.id}>
               <td>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {photoForExecutive(item, state.users) ? <img className="avatar" src={photoForExecutive(item, state.users)} alt={item.fullName} /> : <div className="avatar">{initials(item.fullName)}</div>}
+                  <Avatar src={photoForExecutive(item, state.users)} name={item.fullName} />
                   <div>
                     <strong>{item.fullName}</strong>
                     <p className="muted" style={{ margin: 0 }}>{linkedUser?.email ?? "Sin correo asignado"}</p>

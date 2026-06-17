@@ -6,6 +6,7 @@ import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
 import type { AuthorizedDiscount, CommercialNotification, Executive, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
 import { permissionCatalog } from "@/lib/commercial/admin-config";
+import { Avatar } from "@/components/ui/Avatar";
 
 const roles = [
   "Superadministrador",
@@ -639,7 +640,7 @@ export function SettingsView() {
               <tr key={user.id}>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {user.avatarUrl ? <img className="avatar" src={user.avatarUrl} alt={user.fullName} /> : <span className="avatar">{user.fullName.slice(0, 2).toUpperCase()}</span>}
+                    <Avatar src={user.avatarUrl} name={user.fullName} />
                     <strong>{user.fullName}</strong>
                   </div>
                 </td>
@@ -786,7 +787,9 @@ export function SettingsView() {
             <div className="grid grid-2" style={{ marginTop: 12 }}>
               <div className="card" style={{ boxShadow: "none" }}>
                 <div style={{ display: "grid", placeItems: "center", gap: 14 }}>
-                  {editing.avatarUrl ? <img className="avatar" src={editing.avatarUrl} alt={editing.fullName} style={{ width: 128, height: 128 }} /> : <span className="avatar" style={{ width: 128, height: 128, fontSize: 28 }}>RF</span>}
+                  <div style={{ width: 128, height: 128 }}>
+                    <Avatar src={editing.avatarUrl} name={editing.fullName || "Usuario"} size="xl" />
+                  </div>
                   <label className="ghost-button">
                     <Camera size={16} />
                     Subir foto

@@ -551,10 +551,13 @@ async function getPersistableExecutivePhotoPath(executiveId: string, photoUrl: s
 function extractExecutivePhotoPath(photoUrl: string) {
   try {
     const url = new URL(photoUrl);
-    const marker = "/storage/v1/object/sign/executive-photos/";
-    const markerIndex = url.pathname.indexOf(marker);
-    if (markerIndex === -1) return null;
-    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+    const markers = [
+      "/storage/v1/object/public/executive-photos/",
+      "/storage/v1/object/sign/executive-photos/"
+    ];
+    const marker = markers.find((item) => url.pathname.includes(item));
+    if (!marker) return null;
+    return decodeURIComponent(url.pathname.split(marker)[1] ?? "").split("?")[0];
   } catch {
     return null;
   }
@@ -562,10 +565,12 @@ function extractExecutivePhotoPath(photoUrl: string) {
 
 async function resolveExecutivePhotoUrl(photoUrl: string | null) {
   if (!photoUrl) return "";
-  if (photoUrl.startsWith("http") || photoUrl.startsWith("data:image/") || photoUrl.startsWith("/")) return photoUrl;
+  if (photoUrl.startsWith("data:image/") || photoUrl.startsWith("/")) return photoUrl;
 
   const supabase = getSupabase();
-  const { data, error } = await supabase.storage.from("executive-photos").createSignedUrl(photoUrl, 60 * 60);
+  const path = photoUrl.startsWith("http") ? extractExecutivePhotoPath(photoUrl) : photoUrl;
+  if (!path) return photoUrl.startsWith("http") ? photoUrl : "";
+  const { data, error } = await supabase.storage.from("executive-photos").createSignedUrl(path, 60 * 60);
   if (error) return "";
   return data.signedUrl;
 }

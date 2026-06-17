@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
 import type { Executive, Team, UserProfile } from "@/lib/commercial/types";
+import { Avatar } from "@/components/ui/Avatar";
 
 const emptyTeam: Team = {
   id: "",
@@ -231,7 +232,7 @@ export function TeamsView() {
                 <h3>Integrantes</h3>
                 {teamMembers(detail.team).map((member) => (
                   <div className="card" style={{ boxShadow: "none", display: "flex", alignItems: "center", gap: 12 }} key={member.id}>
-                    {member.photoUrl ? <img className="avatar" src={member.photoUrl} alt={member.fullName} /> : <span className="avatar">{member.fullName.slice(0, 2).toUpperCase()}</span>}
+                    <Avatar src={member.photoUrl} name={member.fullName} />
                     <div style={{ flex: 1 }}>
                       <strong>{member.fullName}</strong>
                       <p className="muted">{member.code} - {member.shift} - {member.status}</p>
@@ -272,7 +273,7 @@ export function TeamsView() {
                 {[...teamMembers(detail.team)].sort((a, b) => b.points - a.points || b.currentSales - a.currentSales).map((member, index) => (
                   <div className="card" style={{ boxShadow: "none", display: "flex", alignItems: "center", gap: 12 }} key={member.id}>
                     <strong style={{ width: 36 }}>#{index + 1}</strong>
-                    {member.photoUrl ? <img className="avatar" src={member.photoUrl} alt={member.fullName} /> : <span className="avatar">{member.fullName.slice(0, 2).toUpperCase()}</span>}
+                    <Avatar src={member.photoUrl} name={member.fullName} />
                     <div style={{ flex: 1 }}>
                       <strong>{member.fullName}</strong>
                       <p className="muted">{money(member.currentSales)} acumulado</p>

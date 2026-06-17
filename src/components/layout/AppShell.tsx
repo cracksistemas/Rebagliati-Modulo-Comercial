@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
+import { Avatar } from "@/components/ui/Avatar";
 
 type SessionHeaderProfile = {
   fullName: string;
@@ -215,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="topbar-actions">
             <span className="badge">Junio 2026</span>
             <span className="badge">
-              {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={profile.fullName} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover" }} /> : null}
+              <Avatar src={profile?.avatarUrl} name={profile?.fullName ?? "Usuario"} size="sm" />
               {profile?.fullName ?? "Gerencia Comercial"}
             </span>
             <NotificationCenter profileName={profile?.fullName ?? "Usuario"} role={profile?.role ?? ""} />

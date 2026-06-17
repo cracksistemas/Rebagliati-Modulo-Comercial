@@ -4,10 +4,7 @@ import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeCommercialDataChange } from "@/lib/commercial/events";
 import { getCommercialState, money } from "@/lib/commercial/store";
-
-function initials(name: string) {
-  return name.split(" ").slice(0, 2).map((part) => part[0]).join("");
-}
+import { Avatar } from "@/components/ui/Avatar";
 
 export function RankingView() {
   const [state, setState] = useState(getCommercialState);
@@ -52,7 +49,7 @@ export function RankingView() {
                 <td><strong>#{index + 1}</strong></td>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {item.photoUrl ? <img className="avatar" src={item.photoUrl} alt={item.fullName} /> : <div className="avatar">{initials(item.fullName)}</div>}
+                    <Avatar src={item.photoUrl} name={item.fullName} />
                     <strong>{item.fullName}</strong>
                   </div>
                 </td>

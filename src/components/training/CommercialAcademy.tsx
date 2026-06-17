@@ -3,6 +3,7 @@
 import { BookOpenCheck, CheckCircle2, ClipboardList, FileText, GraduationCap, PlayCircle, Plus, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getCommercialState } from "@/lib/commercial/store";
+import { Avatar } from "@/components/ui/Avatar";
 
 const learningPaths = [
   {
@@ -148,7 +149,7 @@ export function CommercialAcademy() {
               const progress = [72, 64, 58, 45, 38, 31][index] ?? 25;
               return (
                 <div key={executive.id} className="academy-team-row">
-                  {executive.photoUrl ? <img className="avatar" src={executive.photoUrl} alt={executive.fullName} /> : <div className="avatar">{executive.fullName.slice(0, 2)}</div>}
+                  <Avatar src={executive.photoUrl} name={executive.fullName} />
                   <div>
                     <strong>{executive.fullName}</strong>
                     <span><i style={{ width: `${progress}%` }} /></span>
