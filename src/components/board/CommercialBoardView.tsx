@@ -23,6 +23,16 @@ import { getCommercialState, setCommercialState } from "@/lib/commercial/store";
 import type { CommercialState } from "@/lib/commercial/types";
 import "./commercial-board.css";
 
+type CommercialBoardState = CommercialState & {
+  boardAssignments?: any[];
+  boardLeads?: any[];
+  boardTimeBlocks?: any[];
+  audit?: any[];
+  programs?: any[];
+  executives?: any[];
+  teams?: any[];
+};
+
 type Priority = "Alta" | "Media" | "Baja";
 type BoardTab = "excel" | "events" | "executives" | "hours" | "leads" | "alerts" | "config";
 type SheetMode = "semana" | "finSemana";
@@ -133,7 +143,7 @@ const sourceRows = ["F", "IG", "TIKTOK"];
 const sourceColumns = ["C", "D", "OBST"];
 
 export function CommercialBoardView() {
-  const [state, setState] = useState<CommercialState>(() => getCommercialState());
+  const [state, setState] = useState<CommercialBoardState>(() => getCommercialState() as CommercialBoardState);
   const [tab, setTab] = useState<BoardTab>("excel");
   const [mode, setMode] = useState<SheetMode>(isWeekend(new Date()) ? "finSemana" : "semana");
   const [date, setDate] = useState(today());
@@ -149,21 +159,21 @@ export function CommercialBoardView() {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.ok || !payload.data) return;
-        const current = getCommercialState();
-        const next = {
+        const current = getCommercialState() as CommercialBoardState;
+        const next: CommercialBoardState = {
           ...current,
           boardAssignments: Array.isArray(payload.data.boardAssignments) && payload.data.boardAssignments.length
             ? payload.data.boardAssignments
-            : current.boardAssignments,
+            : current.boardAssignments ?? [],
           boardLeads: Array.isArray(payload.data.boardLeads) && payload.data.boardLeads.length
             ? payload.data.boardLeads
-            : current.boardLeads,
+            : current.boardLeads ?? [],
           boardTimeBlocks: Array.isArray(payload.data.boardTimeBlocks) && payload.data.boardTimeBlocks.length
             ? payload.data.boardTimeBlocks
-            : current.boardTimeBlocks
-        } as CommercialState;
+            : current.boardTimeBlocks ?? []
+        };
         setState(next);
-        setCommercialState(next);
+        setCommercialState(next as CommercialState);
       })
       .catch(() => undefined);
     return () => {
@@ -251,10 +261,10 @@ export function CommercialBoardView() {
         },
         ...((state as any).audit ?? [])
       ]
-    } as CommercialState;
+    } as CommercialBoardState;
 
     setState(nextState);
-    setCommercialState(nextState);
+    setCommercialState(nextState as CommercialState);
     fetch("/api/commercial/board", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
