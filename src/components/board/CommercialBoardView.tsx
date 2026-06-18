@@ -202,6 +202,7 @@ export function CommercialBoardView() {
   const userSlots = sheetConfig.userSlots;
   const whatsappSlots = sheetConfig.whatsappSlots;
   const extraSlots = sheetConfig.extraSlots;
+  const selectableBoardValues = useMemo(() => buildSelectableBoardValues(state, sheetConfig), [state, sheetConfig]);
 
   function patchSheetConfig(nextConfig: any) {
     const nextState = { ...state, boardSheetConfig: nextConfig } as CommercialBoardState;
@@ -345,15 +346,15 @@ export function CommercialBoardView() {
       <section className="board-excel-grid">
         <div className="board-excel-left card">
           <PorAsignarPanel total={sheetConfig.porAsignarTotal ?? kpis.totalCurrent} onChange={updatePorAsignar} />
-          <SlotTable title="Usuarios CRM / Kommo" rows={userSlots} highlight onChange={(id, key, value) => updateSlot("userSlots", id, key, value)} />
-          <SlotTable title="WhatsApp / Bloqueos" rows={whatsappSlots} onChange={(id, key, value) => updateSlot("whatsappSlots", id, key, value)} />
-          <SlotTable title="Otros bloques" rows={extraSlots} onChange={(id, key, value) => updateSlot("extraSlots", id, key, value)} />
+          <SlotTable title="Usuarios CRM / Kommo" rows={userSlots} highlight options={selectableBoardValues} onChange={(id, key, value) => updateSlot("userSlots", id, key, value)} />
+          <SlotTable title="WhatsApp / Bloqueos" rows={whatsappSlots} options={selectableBoardValues} onChange={(id, key, value) => updateSlot("whatsappSlots", id, key, value)} />
+          <SlotTable title="Otros bloques" rows={extraSlots} options={selectableBoardValues} onChange={(id, key, value) => updateSlot("extraSlots", id, key, value)} />
         </div>
 
         <div className="board-excel-right card">
           <SocialMatrix matrix={socialMatrix} onChange={updateSocialCell} />
-          <ApiSummary buckets={apiBuckets} onChange={updateApiBucket} />
-          <CutSchedule blocks={cutBlocks} mode={mode} onChange={updateCutBlock} />
+          <ApiSummary buckets={apiBuckets} options={selectableBoardValues} onChange={updateApiBucket} />
+          <CutSchedule blocks={cutBlocks} mode={mode} options={selectableBoardValues} onChange={updateCutBlock} />
         </div>
       </section>
 
@@ -399,11 +400,13 @@ function SlotTable({
   title,
   rows,
   highlight = false,
+  options,
   onChange
 }: {
   title: string;
   rows: UserSlot[];
   highlight?: boolean;
+  options: BoardSelectOptions;
   onChange: (id: string, key: keyof UserSlot, value: string | number) => void;
 }) {
   return (
@@ -413,14 +416,14 @@ function SlotTable({
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <th><input className="editable-cell code-cell" value={row.code} onChange={(event) => onChange(row.id, "code", event.target.value)} /></th>
-              <td><input className="editable-cell" value={row.range} onChange={(event) => onChange(row.id, "range", event.target.value)} /></td>
+              <th><EditableSelectCell value={row.code} options={options.codes} label={`${title} codigo`} className="code-cell" onChange={(value) => onChange(row.id, "code", value)} /></th>
+              <td><EditableSelectCell value={row.range} options={options.ranges} label={`${title} numero o rango`} onChange={(value) => onChange(row.id, "range", value)} /></td>
               <td className={row.status ? "restricted-cell" : ""}>
-                <input className="editable-cell" value={row.primary} onChange={(event) => onChange(row.id, "primary", event.target.value)} />
+                <EditableSelectCell value={row.primary} options={options.people} label={`${title} responsable principal`} onChange={(value) => onChange(row.id, "primary", value)} />
               </td>
-              {highlight ? <td><input className="editable-cell" value={row.secondary} onChange={(event) => onChange(row.id, "secondary", event.target.value)} /></td> : null}
+              {highlight ? <td><EditableSelectCell value={row.secondary} options={options.people} label={`${title} responsable secundario`} onChange={(value) => onChange(row.id, "secondary", value)} /></td> : null}
               <td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={row.count} onChange={(event) => onChange(row.id, "count", Number(event.target.value))} /></td>
-              {!highlight ? <td><input className="editable-cell" value={row.status ?? ""} onChange={(event) => onChange(row.id, "status", event.target.value)} placeholder="Estado" /></td> : null}
+              {!highlight ? <td><EditableSelectCell value={row.status ?? ""} options={options.statuses} label={`${title} estado`} placeholder="Estado" onChange={(value) => onChange(row.id, "status", value)} /></td> : null}
             </tr>
           ))}
         </tbody>
@@ -482,23 +485,70 @@ function SocialMatrix({ matrix, onChange }: { matrix: Record<string, Record<stri
   );
 }
 
-function ApiSummary({ buckets, onChange }: { buckets: ApiBucket[]; onChange: (index: number, key: keyof ApiBucket, value: string | number) => void }) {
+type BoardSelectOptions = {
+  people: string[];
+  codes: string[];
+  ranges: string[];
+  statuses: string[];
+  apiCodes: string[];
+  apiLabels: string[];
+  cutLabels: string[];
+};
+
+function EditableSelectCell({
+  value,
+  options,
+  label,
+  placeholder = "Seleccionar",
+  className = "",
+  onChange
+}: {
+  value: string;
+  options: string[];
+  label: string;
+  placeholder?: string;
+  className?: string;
+  onChange: (value: string) => void;
+}) {
+  const mergedOptions = unique([value, ...options].map((item) => String(item ?? "").trim()).filter(Boolean));
+
+  function addOption() {
+    const next = window.prompt(`Agregar ${label.toLowerCase()}`, value || "");
+    if (next === null) return;
+    const clean = next.trim();
+    if (clean) onChange(clean);
+  }
+
+  return (
+    <div className="editable-select-cell">
+      <select className={`editable-cell ${className}`} value={value} aria-label={label} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{placeholder}</option>
+        {mergedOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+      <button type="button" className="inline-add-button" aria-label={`Agregar ${label}`} title={`Agregar ${label}`} onClick={addOption}>
+        <Plus size={12} />
+      </button>
+    </div>
+  );
+}
+
+function ApiSummary({ buckets, options, onChange }: { buckets: ApiBucket[]; options: BoardSelectOptions; onChange: (index: number, key: keyof ApiBucket, value: string | number) => void }) {
   return (
     <div className="sheet-side-section">
       <table className="excel-mini-table api-table">
         <thead><tr><th>API</th><th>Total</th><th></th></tr></thead>
-        <tbody>{buckets.map((bucket, index) => <tr key={`${bucket.api}-${index}`}><td><input className="editable-cell code-cell" value={bucket.api} onChange={(event) => onChange(index, "api", event.target.value)} /></td><td><input className="editable-cell" value={bucket.label} onChange={(event) => onChange(index, "label", event.target.value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={bucket.total} onChange={(event) => onChange(index, "total", Number(event.target.value))} /></td></tr>)}</tbody>
+        <tbody>{buckets.map((bucket, index) => <tr key={`${bucket.api}-${index}`}><td><EditableSelectCell value={bucket.api} options={options.apiCodes} label="codigo API" className="code-cell" onChange={(value) => onChange(index, "api", value)} /></td><td><EditableSelectCell value={bucket.label} options={options.apiLabels} label="bloque API" onChange={(value) => onChange(index, "label", value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={bucket.total} onChange={(event) => onChange(index, "total", Number(event.target.value))} /></td></tr>)}</tbody>
       </table>
     </div>
   );
 }
 
-function CutSchedule({ blocks, mode, onChange }: { blocks: CutBlock[]; mode: SheetMode; onChange: (index: number, key: keyof CutBlock, value: string | number) => void }) {
+function CutSchedule({ blocks, mode, options, onChange }: { blocks: CutBlock[]; mode: SheetMode; options: BoardSelectOptions; onChange: (index: number, key: keyof CutBlock, value: string | number) => void }) {
   const key = mode === "semana" ? "weekdayGoal" : "weekendGoal";
   return (
     <div className="sheet-side-section cuts-section">
       <h3>{mode === "semana" ? "CORTES DE SEMANA" : "CORTES FIN DE SEMANA"}</h3>
-      <table className="cut-table"><tbody>{blocks.map((block, index) => <tr key={`${block.label}-${index}`}><td><input className="editable-cell" value={block.label} onChange={(event) => onChange(index, "label", event.target.value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={Number(block[key] ?? 0)} onChange={(event) => onChange(index, key, Number(event.target.value))} /></td></tr>)}</tbody></table>
+      <table className="cut-table"><tbody>{blocks.map((block, index) => <tr key={`${block.label}-${index}`}><td><EditableSelectCell value={block.label} options={options.cutLabels} label="corte horario" onChange={(value) => onChange(index, "label", value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={Number(block[key] ?? 0)} onChange={(event) => onChange(index, key, Number(event.target.value))} /></td></tr>)}</tbody></table>
     </div>
   );
 }
@@ -770,6 +820,30 @@ function buildEmptyRow(state: CommercialState, date: string): BoardRow {
 
 function activeExecutives(state: CommercialState) {
   return (Array.isArray((state as any).executives) ? (state as any).executives : []).filter((item: any) => item.status === "Activo");
+}
+
+function buildSelectableBoardValues(state: CommercialState, sheetConfig: any): BoardSelectOptions {
+  const slots: UserSlot[] = [
+    ...(Array.isArray(sheetConfig.userSlots) ? sheetConfig.userSlots : []),
+    ...(Array.isArray(sheetConfig.whatsappSlots) ? sheetConfig.whatsappSlots : []),
+    ...(Array.isArray(sheetConfig.extraSlots) ? sheetConfig.extraSlots : [])
+  ];
+  const apiBuckets: ApiBucket[] = Array.isArray(sheetConfig.apiBuckets) ? sheetConfig.apiBuckets : [];
+  const cutBlocks: CutBlock[] = Array.isArray(sheetConfig.cutBlocks) ? sheetConfig.cutBlocks : [];
+  const executives = activeExecutives(state).map((item: any) => String(item.fullName ?? "").trim()).filter(Boolean);
+  const splitSlotPeople = slots.flatMap((slot) => [slot.primary, slot.secondary])
+    .flatMap((value) => String(value ?? "").split("/").map((item) => item.trim()))
+    .filter(Boolean);
+
+  return {
+    people: unique([...executives, ...splitSlotPeople, "Bloqueado", "Restringido", "Sin asignar"]),
+    codes: unique([...slots.map((slot) => slot.code), "U1", "U2", "U3", "U4", "U5", "U6", "W1", "W2", "W3"].filter(Boolean)),
+    ranges: unique([...slots.map((slot) => slot.range), "598 - 779", "567 - 177", "002 - 945", "098", "185", "833"].filter(Boolean)),
+    statuses: unique([...slots.map((slot) => slot.status ?? ""), "ACTIVO", "BLOQUEADO", "RESTRINGIDO", "OBSERVACION", "SIN ASIGNAR"].filter(Boolean)),
+    apiCodes: unique([...apiBuckets.map((bucket) => bucket.api), "517", "691", "678"].filter(Boolean)),
+    apiLabels: unique([...apiBuckets.map((bucket) => bucket.label), "Diplomado", "Cursos", "Obstetricia", "Certifícate", "Campaña"].filter(Boolean)),
+    cutLabels: unique([...cutBlocks.map((block) => block.label), "8:00 AM", "12:00 PM", "2:30 PM", "5:00 PM", "7:00 PM", "8:45 PM"].filter(Boolean))
+  };
 }
 
 function findExecutive(state: CommercialState, id?: string) {

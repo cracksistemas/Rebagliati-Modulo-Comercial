@@ -7,6 +7,7 @@ import { getCommercialState, money, setCommercialState } from "@/lib/commercial/
 import type { AuthorizedDiscount, CommercialNotification, Executive, RolePermissionConfig, UserProfile } from "@/lib/commercial/types";
 import { permissionCatalog } from "@/lib/commercial/admin-config";
 import { Avatar } from "@/components/ui/Avatar";
+import "./settings.css";
 
 const roles = [
   "Superadministrador",
@@ -603,16 +604,31 @@ export function SettingsView() {
   }
 
   return (
-    <div className="grid">
-      <section className="grid grid-4">
+    <div className="grid settings-console">
+      <section className="grid grid-4 settings-kpi-strip">
         <div className="card metric"><span className="muted">Usuarios activos</span><strong>{users.filter((u) => u.status === "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Usuarios inactivos</span><strong>{users.filter((u) => u.status !== "Activo").length}</strong></div>
         <div className="card metric"><span className="muted">Roles creados</span><strong>{roles.length}</strong></div>
         <div className="card metric"><span className="muted">Ejecutivos vinculados</span><strong>{linkedExecutiveCount}</strong></div>
       </section>
 
-      <section className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+      <section className="card settings-admin-map">
+        <div>
+          <p className="eyebrow">Centro administrativo</p>
+          <h2>Configuracion de usuarios y reglas</h2>
+          <p className="muted">Gestiona accesos, permisos por rol, descuentos autorizados, comunicados y trazabilidad desde una sola vista.</p>
+        </div>
+        <nav aria-label="Secciones de configuracion">
+          <a href="#settings-users"><UsersRound size={16} /> Usuarios</a>
+          <a href="#settings-permissions"><ShieldCheck size={16} /> Roles y permisos</a>
+          <a href="#settings-discounts"><Download size={16} /> Descuentos</a>
+          <a href="#settings-notifications"><Bell size={16} /> Notificaciones</a>
+          <a href="#settings-audit"><Lock size={16} /> Auditoria</a>
+        </nav>
+      </section>
+
+      <section id="settings-users" className="card settings-section-card settings-users-card">
+        <div className="settings-section-header">
           <div>
             <p className="eyebrow">Usuarios</p>
             <h2>Usuarios, roles y auditoria</h2>
@@ -684,8 +700,8 @@ export function SettingsView() {
         </div>
       </section>
 
-      <section className="grid grid-2">
-        <div className="card">
+      <section className="grid grid-2 settings-admin-grid">
+        <div id="settings-permissions" className="card settings-section-card">
           <p className="eyebrow">Permisos editables</p>
           <h2>Modulos y submodulos por rol</h2>
           {settingsStatus ? <p className="badge" style={{ marginTop: 10 }}>{settingsStatus}</p> : null}
@@ -712,7 +728,7 @@ export function SettingsView() {
           </div>
         </div>
 
-        <div className="card">
+        <div id="settings-discounts" className="card settings-section-card">
           <p className="eyebrow">Descuentos</p>
           <h2>Descuentos autorizados</h2>
           <div className="form-grid" style={{ marginTop: 12 }}>
@@ -745,8 +761,8 @@ export function SettingsView() {
         </div>
       </section>
 
-      <section className="grid grid-2">
-        <div className="card">
+      <section className="grid grid-2 settings-admin-grid">
+        <div id="settings-notifications" className="card settings-section-card">
           <p className="eyebrow">Notificaciones</p>
           <h2>Comunicados y recordatorios</h2>
           <p className="muted">Los comunicados activos aparecen en la campana y se muestran como modal al ingresar.</p>
@@ -760,21 +776,21 @@ export function SettingsView() {
             <button className="primary-button" disabled={!canEditRules} onClick={sendNotification}><Send size={16} /> Enviar comunicado</button>
           </div>
         </div>
-        <div className="card">
-          <p className="eyebrow">Bandeja</p>
-          <h2>Ultimas notificaciones</h2>
+        <div id="settings-audit" className="card settings-section-card">
+          <p className="eyebrow">Auditoria</p>
+          <h2>Eventos sensibles</h2>
           <div className="grid">
-            {state.notifications.slice(0, 5).map((notification) => (
-              <div key={notification.id} style={{ display: "flex", gap: 10, borderBottom: "1px solid #E5E5EA", paddingBottom: 10 }}>
-                <span className="avatar"><Bell size={16} /></span>
+            {state.audit.slice(0, 6).map((event) => (
+              <div key={event.id} style={{ display: "flex", gap: 10, borderBottom: "1px solid #E5E5EA", paddingBottom: 10 }}>
+                <span className="avatar"><Lock size={16} /></span>
                 <div>
-                  <strong>{notification.title}</strong>
-                  <p className="muted">{notification.audience} - {notification.type} - {notification.createdAt}</p>
-                  <p className="muted">{notification.message}</p>
-                  {notification.authorizedBy ? <span className="badge">Autorizado por {notification.authorizedBy}</span> : null}
+                  <strong>{event.action}</strong>
+                  <p className="muted">{event.actor} - {event.module} - {event.createdAt}</p>
+                  <span className="badge">{event.result}</span>
                 </div>
               </div>
             ))}
+            {!state.audit.length ? <p className="muted">Aun no hay eventos de auditoria visibles.</p> : null}
           </div>
         </div>
       </section>

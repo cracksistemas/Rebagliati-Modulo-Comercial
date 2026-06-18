@@ -194,6 +194,37 @@
   box-shadow: inset 0 0 0 2px rgba(0, 167, 235, 0.55);
 }
 
+.editable-select-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.editable-select-cell select.editable-cell {
+  appearance: none;
+  min-height: 24px;
+  padding-right: 4px;
+  cursor: pointer;
+}
+
+.inline-add-button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(0, 167, 235, 0.12);
+  color: var(--reba-primary);
+  cursor: pointer;
+}
+
+.inline-add-button:hover {
+  background: var(--reba-accent);
+  color: #fff;
+}
+
 .por-asignar-value.editable-cell {
   height: 100%;
   border-radius: 0;
