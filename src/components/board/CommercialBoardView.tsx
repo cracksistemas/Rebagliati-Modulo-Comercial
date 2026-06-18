@@ -342,50 +342,20 @@ export function CommercialBoardView() {
         </div>
       </section>
 
-      <section className="board-excel-toolbar card">
-        <label><CalendarDays size={15} /> Fecha <input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-        <label><UsersRound size={15} /> Ejecutivo <select value={executiveFilter} onChange={(event) => setExecutiveFilter(event.target.value)}><option>Todos</option>{activeExecutives(state).map((item: any) => <option key={item.id} value={item.id}>{item.fullName}</option>)}</select></label>
-        <label><AlertTriangle size={15} /> Prioridad <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option>Todos</option>{priorityOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label><Clock3 size={15} /> Tipo de corte <select value={mode} onChange={(event) => setMode(event.target.value as SheetMode)}><option value="semana">Cortes de semana</option><option value="finSemana">Cortes fin de semana</option></select></label>
-        <label className="board-excel-search"><Search size={15} /> Buscar <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ejecutivo, evento, fuente, codigo" /></label>
+      <section className="board-excel-grid">
+        <div className="board-excel-left card">
+          <PorAsignarPanel total={sheetConfig.porAsignarTotal ?? kpis.totalCurrent} onChange={updatePorAsignar} />
+          <SlotTable title="Usuarios CRM / Kommo" rows={userSlots} highlight onChange={(id, key, value) => updateSlot("userSlots", id, key, value)} />
+          <SlotTable title="WhatsApp / Bloqueos" rows={whatsappSlots} onChange={(id, key, value) => updateSlot("whatsappSlots", id, key, value)} />
+          <SlotTable title="Otros bloques" rows={extraSlots} onChange={(id, key, value) => updateSlot("extraSlots", id, key, value)} />
+        </div>
+
+        <div className="board-excel-right card">
+          <SocialMatrix matrix={socialMatrix} onChange={updateSocialCell} />
+          <ApiSummary buckets={apiBuckets} onChange={updateApiBucket} />
+          <CutSchedule blocks={cutBlocks} mode={mode} onChange={updateCutBlock} />
+        </div>
       </section>
-
-      <nav className="board-excel-tabs" aria-label="Vistas de Mi Pizarra Virtual">
-        {tabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}>{item.label}</button>)}
-      </nav>
-
-      <section className="board-excel-kpis">
-        <MetricCard icon={<FileSpreadsheet />} label="Total actual" value={String(kpis.totalCurrent)} helper="Leads por asignar + bloques" />
-        <MetricCard icon={<UsersRound />} label="Leads asignados" value={String(kpis.assignedLeads)} helper={`${kpis.pendingLeads} pendientes`} />
-        <MetricCard icon={<PhoneCall />} label="Llamadas" value={String(kpis.callsMade)} helper={`Meta ${kpis.dailyGoal}`} />
-        <MetricCard icon={<BarChart3 />} label="Avance" value={`${kpis.advance.toFixed(2)}%`} helper={`${kpis.goalCompletion.toFixed(1)}% del objetivo`} />
-        <MetricCard icon={<MessageCircle />} label="WhatsApp" value={`${kpis.whatsappResponse.toFixed(1)}%`} helper={`${kpis.messagesReceived} respuestas`} />
-        <MetricCard icon={<AlertTriangle />} label="Alertas" value={String(alerts.length)} helper="Acciones sugeridas" />
-      </section>
-
-      {tab === "excel" ? (
-        <section className="board-excel-grid">
-          <div className="board-excel-left card">
-            <PorAsignarPanel total={sheetConfig.porAsignarTotal ?? kpis.totalCurrent} onChange={updatePorAsignar} />
-            <SlotTable title="Usuarios CRM / Kommo" rows={userSlots} highlight onChange={(id, key, value) => updateSlot("userSlots", id, key, value)} />
-            <SlotTable title="WhatsApp / Bloqueos" rows={whatsappSlots} onChange={(id, key, value) => updateSlot("whatsappSlots", id, key, value)} />
-            <SlotTable title="Otros bloques" rows={extraSlots} onChange={(id, key, value) => updateSlot("extraSlots", id, key, value)} />
-          </div>
-
-          <div className="board-excel-right card">
-            <SocialMatrix matrix={socialMatrix} onChange={updateSocialCell} />
-            <ApiSummary buckets={apiBuckets} onChange={updateApiBucket} />
-            <CutSchedule blocks={cutBlocks} mode={mode} onChange={updateCutBlock} />
-          </div>
-        </section>
-      ) : null}
-
-      {tab === "events" ? <EventsView rows={filteredRows} onEdit={openEditor} /> : null}
-      {tab === "executives" ? <ExecutivesView rows={filteredRows} state={state} /> : null}
-      {tab === "hours" ? <HoursView blocks={cutBlocks} rows={filteredRows} /> : null}
-      {tab === "leads" ? <LeadsView state={state} /> : null}
-      {tab === "alerts" ? <AlertsView alerts={alerts} rows={filteredRows} /> : null}
-      {tab === "config" ? <ConfigView /> : null}
 
       {editing ? (
         <div className="modal-backdrop">
