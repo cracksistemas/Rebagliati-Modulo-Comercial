@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
+  ClipboardList,
   Flag,
   GraduationCap,
   LayoutDashboard,
@@ -39,6 +40,7 @@ const navItems = [
   { href: "/dashboard", label: "Resumen mensual", icon: LayoutDashboard, permission: "dashboard.resumen" },
   { href: "/sales/new", label: "Registrar venta", icon: CircleDollarSign, permission: "sales.new" },
   { href: "/products", label: "Productos y Eventos", icon: PackageOpen, permission: "products.view" },
+  { href: "/board", label: "Pizarra Comercial", icon: ClipboardList, permission: "board.view" },
   { href: "/ranking", label: "Ranking de ejecutivos", icon: Trophy, permission: "ranking.executives" },
   { href: "/teams", label: "Ventas por equipo", icon: UsersRound, permission: "teams.view" },
   { href: "/executives", label: "Ejecutivos", icon: Flag, permission: "executives.manage" },
@@ -58,12 +60,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const title = useMemo(() => {
+    if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) return "Resumen Ejecutivo";
     if (pathname.includes("customer-map")) return "Mapa de Clientes";
     if (pathname.includes("settings")) return "Configuración";
     if (pathname.includes("executives")) return "Directorio comercial";
     if (pathname.includes("incidents")) return "Incidencias";
     if (pathname.includes("training")) return "Academia Comercial";
     if (pathname.includes("products")) return "Productos y Eventos";
+    if (pathname.includes("/board")) return "Pizarra Comercial Inteligente";
     if (pathname.includes("teams")) return "Ventas por equipo";
     if (pathname.includes("ranking")) return "Ranking de ejecutivos";
     if (pathname.includes("sales")) return "Control de ventas";
@@ -140,12 +144,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     if (role.includes("ejecutivo") && !role.includes("lider")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/sales/new", "/products", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/sales/new", "/products", "/board", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
       );
     }
     if (role.includes("marketing") || role.includes("solo lectura") || role.includes("marketing_soporte")) {
       return navItems.filter((item) =>
-        ["/dashboard", "/products", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
+        ["/dashboard", "/products", "/board", "/ranking", "/teams", "/incidents", "/training", "/customer-map", "/reports"].includes(item.href)
       );
     }
     return navItems;

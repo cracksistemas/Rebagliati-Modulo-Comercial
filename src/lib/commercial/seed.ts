@@ -46,6 +46,83 @@ export const seedState: CommercialState = {
     }
   ],
   reminders: [],
+  boardAssignments: [],
+  boardLeads: [
+    {
+      id: "board-lead-sheet-1",
+      leadName: "Bloque por asignar U1",
+      phone: "598 - 779",
+      source: "Redes sociales",
+      campaign: "Pizarra digital",
+      productInterest: "Por definir",
+      createdAt: "2026-06-17 08:00",
+      kommoStatus: "Por asignar",
+      score: 72,
+      suggestedPriority: "Alta"
+    },
+    {
+      id: "board-lead-sheet-2",
+      leadName: "Bloque por asignar U2",
+      phone: "598 - 779",
+      source: "Facebook / Instagram",
+      campaign: "Pizarra digital",
+      productInterest: "Curso / Diplomado",
+      createdAt: "2026-06-17 12:00",
+      kommoStatus: "Por asignar",
+      score: 58,
+      suggestedPriority: "Media"
+    }
+  ],
+  boardTimeBlocks: [
+    { id: "block-0800", blockTime: "08:00", blockLabel: "08:00 AM", blockWeight: 0.15, assignedLeadsCount: 0, callGoal: 0, callsMade: 0, messagesSent: 0, messagesReceived: 0, contactsMade: 0, salesCount: 0 },
+    { id: "block-1200", blockTime: "12:00", blockLabel: "12:00 PM", blockWeight: 0.2, assignedLeadsCount: 0, callGoal: 0, callsMade: 0, messagesSent: 0, messagesReceived: 0, contactsMade: 0, salesCount: 0 },
+    { id: "block-1430", blockTime: "14:30", blockLabel: "02:30 PM", blockWeight: 0.2, assignedLeadsCount: 0, callGoal: 0, callsMade: 0, messagesSent: 0, messagesReceived: 0, contactsMade: 0, salesCount: 0 },
+    { id: "block-1700", blockTime: "17:00", blockLabel: "05:00 PM", blockWeight: 0.2, assignedLeadsCount: 0, callGoal: 0, callsMade: 0, messagesSent: 0, messagesReceived: 0, contactsMade: 0, salesCount: 0 },
+    { id: "block-1900", blockTime: "19:00", blockLabel: "07:00 PM", blockWeight: 0.15, assignedLeadsCount: 0, callGoal: 0, callsMade: 0, messagesSent: 0, messagesReceived: 0, contactsMade: 0, salesCount: 0 },
+    { id: "block-2045", blockTime: "20:45", blockLabel: "08:45 PM", blockWeight: 0.1, assignedLeadsCount: 0, callGoal: 0, callsMade: 0, messagesSent: 0, messagesReceived: 0, contactsMade: 0, salesCount: 0 }
+  ],
+  boardSheetConfig: {
+    porAsignarTotal: 25,
+    userSlots: [
+      { id: "u1", code: "U1", range: "598 - 779", primary: "Carolina", secondary: "Eliana", count: 7 },
+      { id: "u2", code: "U2", range: "598 - 779", primary: "Mariana", secondary: "Mariana", count: 1 },
+      { id: "u3", code: "U3", range: "567 - 177", primary: "Maria", secondary: "Samantha", count: 0 },
+      { id: "u4", code: "U4", range: "567 - 177", primary: "Samantha", secondary: "Samantha", count: 0 },
+      { id: "u5", code: "U5", range: "002 - 945", primary: "Eliana", secondary: "Eliana", count: 0 },
+      { id: "u6", code: "U6", range: "002 - 945", primary: "Eliana", secondary: "Alexandra", count: 6 }
+    ],
+    whatsappSlots: [
+      { id: "w1", code: "W1", range: "098", primary: "Mariana", secondary: "", count: 0 },
+      { id: "w2", code: "W2", range: "185", primary: "Bloqueado", secondary: "", count: 11, status: "BLOQUEADO" },
+      { id: "w3", code: "W3", range: "833", primary: "Samantha / Bonnie", secondary: "", count: 0 }
+    ],
+    extraSlots: [
+      { id: "e1", code: "443", range: "", primary: "Alexandra", secondary: "", count: 0 },
+      { id: "e2", code: "772", range: "", primary: "Eliana", secondary: "", count: 0 },
+      { id: "e3", code: "920", range: "", primary: "Alexandra / Nikool / Ariana", secondary: "", count: 0 },
+      { id: "e4", code: "654", range: "", primary: "Bonnie", secondary: "", count: 0 },
+      { id: "e5", code: "302", range: "", primary: "Bonnie", secondary: "", count: 0 },
+      { id: "e6", code: "929", range: "", primary: "Restringido", secondary: "", count: 0, status: "RESTRINGIDO" }
+    ],
+    socialMatrix: {
+      F: { C: 0, D: 0, OBST: 0 },
+      IG: { C: 0, D: 0, OBST: 0 },
+      TIKTOK: { C: 0, D: 0, OBST: 0 }
+    },
+    apiBuckets: [
+      { api: "517", label: "Diplomado", total: 1 },
+      { api: "691", label: "Cursos", total: 1 },
+      { api: "678", label: "Obstetricia", total: 2 }
+    ],
+    cutBlocks: [
+      { label: "8:00 AM", weekdayGoal: 25, weekendGoal: 0, weight: 0.15 },
+      { label: "12:00 PM", weekdayGoal: 18, weekendGoal: 0, weight: 0.2 },
+      { label: "2:30 PM", weekdayGoal: 0, weekendGoal: 0, weight: 0.2 },
+      { label: "5:00 PM", weekdayGoal: 0, weekendGoal: 0, weight: 0.2 },
+      { label: "7:00 PM", weekdayGoal: 0, weekendGoal: 0, weight: 0.15 },
+      { label: "8:45 PM", weekdayGoal: 0, weekendGoal: 0, weight: 0.1 }
+    ]
+  },
   audit: [
     {
       id: "audit-1",

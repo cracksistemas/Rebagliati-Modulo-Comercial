@@ -380,6 +380,119 @@ export type UserReminder = {
   completed: boolean;
 };
 
+export type CommercialBoardPriority = "Alta" | "Media" | "Baja";
+export type CommercialBoardStatus =
+  | "Sin iniciar"
+  | "En gestion"
+  | "En riesgo"
+  | "Avance bajo"
+  | "En ritmo"
+  | "Objetivo cumplido"
+  | "Cerrado"
+  | "Pausado";
+
+export type CommercialBoardComment = {
+  id: string;
+  comment: string;
+  user: string;
+  createdAt: string;
+  type: "Observacion" | "Cambio de prioridad" | "Reasignacion" | "Bloqueo" | "Seguimiento" | "Alerta";
+};
+
+export type CommercialBoardAssignment = {
+  id: string;
+  boardDate: string;
+  executiveId: string;
+  teamId?: string;
+  productEditionId?: string;
+  productName: string;
+  productCode?: string;
+  productType: ProductType;
+  modality?: string;
+  eventStartDate?: string;
+  leadSource: string;
+  campaign?: string;
+  priority: CommercialBoardPriority;
+  priorityScore: number;
+  assignedLeadsCount: number;
+  leadsAssignedToday: number;
+  dailyCallGoal: number;
+  callsMade: number;
+  callsAnswered: number;
+  messagesSent: number;
+  messagesReceived: number;
+  contactsMade: number;
+  salesCount: number;
+  salesAmount: number;
+  status: CommercialBoardStatus;
+  lastUpdatedAt: string;
+  comments?: CommercialBoardComment[];
+  kommoUrl?: string;
+};
+
+export type CommercialBoardLead = {
+  id: string;
+  leadName: string;
+  phone?: string;
+  source: string;
+  campaign?: string;
+  productInterest: string;
+  createdAt: string;
+  kommoStatus?: string;
+  score: number;
+  suggestedPriority: CommercialBoardPriority;
+  assignedTo?: string;
+  kommoLeadId?: string;
+  kommoUrl?: string;
+};
+
+export type CommercialBoardTimeBlock = {
+  id: string;
+  blockTime: string;
+  blockLabel: string;
+  blockWeight: number;
+  assignedLeadsCount: number;
+  callGoal: number;
+  callsMade: number;
+  messagesSent: number;
+  messagesReceived: number;
+  contactsMade: number;
+  salesCount: number;
+};
+
+export type CommercialBoardSheetSlot = {
+  id: string;
+  code: string;
+  range: string;
+  primary: string;
+  secondary: string;
+  count: number;
+  status?: string;
+};
+
+export type CommercialBoardApiBucket = {
+  api: string;
+  label: string;
+  total: number;
+};
+
+export type CommercialBoardCutBlock = {
+  label: string;
+  weekdayGoal: number;
+  weekendGoal: number;
+  weight: number;
+};
+
+export type CommercialBoardSheetConfig = {
+  porAsignarTotal?: number;
+  userSlots: CommercialBoardSheetSlot[];
+  whatsappSlots: CommercialBoardSheetSlot[];
+  extraSlots: CommercialBoardSheetSlot[];
+  socialMatrix: Record<string, Record<string, number>>;
+  apiBuckets: CommercialBoardApiBucket[];
+  cutBlocks: CommercialBoardCutBlock[];
+};
+
 export type CommercialState = {
   month: string;
   companyGoal: number;
@@ -399,4 +512,8 @@ export type CommercialState = {
   reminders: UserReminder[];
   audit: AuditEvent[];
   clientProfiles: ClientProfile[];
+  boardAssignments: CommercialBoardAssignment[];
+  boardLeads: CommercialBoardLead[];
+  boardTimeBlocks: CommercialBoardTimeBlock[];
+  boardSheetConfig: CommercialBoardSheetConfig;
 };

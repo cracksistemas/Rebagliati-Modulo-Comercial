@@ -172,7 +172,11 @@ function normalizeState(value: Partial<CommercialState> | null | undefined): Com
     notifications: asArray<CommercialNotification>(source.notifications, seedState.notifications),
     reminders: asArray<UserReminder>(source.reminders, seedState.reminders),
     audit: asArray(source.audit, seedState.audit),
-    clientProfiles: asArray(source.clientProfiles, seedState.clientProfiles)
+    clientProfiles: asArray(source.clientProfiles, seedState.clientProfiles),
+    boardAssignments: asArray(source.boardAssignments, seedState.boardAssignments),
+    boardLeads: asArray(source.boardLeads, seedState.boardLeads),
+    boardTimeBlocks: asArray(source.boardTimeBlocks, seedState.boardTimeBlocks),
+    boardSheetConfig: source.boardSheetConfig ?? seedState.boardSheetConfig
   };
 }
 

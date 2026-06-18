@@ -170,7 +170,8 @@ export function CommercialBoardView() {
             : current.boardLeads ?? [],
           boardTimeBlocks: Array.isArray(payload.data.boardTimeBlocks) && payload.data.boardTimeBlocks.length
             ? payload.data.boardTimeBlocks
-            : current.boardTimeBlocks ?? []
+            : current.boardTimeBlocks ?? [],
+          boardSheetConfig: payload.data.boardSheetConfig ?? current.boardSheetConfig
         };
         setState(next);
         setCommercialState(next as CommercialState);
@@ -193,13 +194,64 @@ export function CommercialBoardView() {
   }, [rows, query, executiveFilter, priorityFilter]);
 
   const kpis = useMemo(() => buildKpis(filteredRows, state), [filteredRows, state]);
-  const socialMatrix = useMemo(() => buildSocialMatrix(filteredRows, state), [filteredRows, state]);
-  const apiBuckets = useMemo(() => buildApiBuckets(filteredRows), [filteredRows]);
+  const sheetConfig = useMemo(() => normalizeSheetConfig((state as any).boardSheetConfig), [state]);
+  const socialMatrix = sheetConfig.socialMatrix;
+  const apiBuckets = sheetConfig.apiBuckets;
   const alerts = useMemo(() => buildAlerts(filteredRows, state), [filteredRows, state]);
-  const cutBlocks = useMemo(() => buildCutBlocks(state, filteredRows), [state, filteredRows]);
-  const userSlots = useMemo(() => buildUserSlots(defaultUserSlots, filteredRows), [filteredRows]);
-  const whatsappSlots = useMemo(() => buildOperationalSlots(defaultWhatsappSlots, state), [state]);
-  const extraSlots = useMemo(() => buildOperationalSlots(defaultExtraSlots, state), [state]);
+  const cutBlocks = sheetConfig.cutBlocks;
+  const userSlots = sheetConfig.userSlots;
+  const whatsappSlots = sheetConfig.whatsappSlots;
+  const extraSlots = sheetConfig.extraSlots;
+
+  function patchSheetConfig(nextConfig: any) {
+    const nextState = { ...state, boardSheetConfig: nextConfig } as CommercialBoardState;
+    setState(nextState);
+    setCommercialState(nextState as CommercialState);
+    fetch("/api/commercial/board", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sheetConfig: nextConfig })
+    }).catch(() => undefined);
+  }
+
+  function updatePorAsignar(value: number) {
+    patchSheetConfig({ ...sheetConfig, porAsignarTotal: value });
+  }
+
+  function updateSlot(section: "userSlots" | "whatsappSlots" | "extraSlots", id: string, key: keyof UserSlot, value: string | number) {
+    patchSheetConfig({
+      ...sheetConfig,
+      [section]: sheetConfig[section].map((slot: UserSlot) => (slot.id === id ? { ...slot, [key]: key === "count" ? Number(value) : value } : slot))
+    });
+  }
+
+  function updateSocialCell(row: string, column: string, value: number) {
+    patchSheetConfig({
+      ...sheetConfig,
+      socialMatrix: {
+        ...sheetConfig.socialMatrix,
+        [row]: { ...(sheetConfig.socialMatrix[row] ?? {}), [column]: value }
+      }
+    });
+  }
+
+  function updateApiBucket(index: number, key: keyof ApiBucket, value: string | number) {
+    patchSheetConfig({
+      ...sheetConfig,
+      apiBuckets: sheetConfig.apiBuckets.map((bucket: ApiBucket, current: number) => (current === index ? { ...bucket, [key]: key === "total" ? Number(value) : value } : bucket))
+    });
+  }
+
+  function updateCutBlock(index: number, key: keyof CutBlock, value: string | number) {
+    patchSheetConfig({
+      ...sheetConfig,
+      cutBlocks: sheetConfig.cutBlocks.map((block: CutBlock, current: number) => (current === index ? { ...block, [key]: key === "label" ? value : Number(value) } : block))
+    });
+  }
+
+  function exportPdf() {
+    window.print();
+  }
 
   function openEditor(row?: BoardRow) {
     const base = row ?? buildEmptyRow(state, date);
@@ -285,6 +337,7 @@ export function CommercialBoardView() {
         <div className="board-excel-actions">
           <button className="ghost-button" onClick={() => window.location.reload()}><RefreshCw size={16} /> Actualizar</button>
           <button className="ghost-button" onClick={() => exportRows(filteredRows)}><Download size={16} /> Exportar CSV</button>
+          <button className="ghost-button" onClick={exportPdf}><Download size={16} /> Exportar PDF</button>
           <button className="primary-button" onClick={() => openEditor()}><Plus size={16} /> Nueva fila</button>
         </div>
       </section>
@@ -313,10 +366,10 @@ export function CommercialBoardView() {
       {tab === "excel" ? (
         <section className="board-excel-grid">
           <div className="board-excel-left card">
-            <PorAsignarPanel total={kpis.totalCurrent} />
-            <SlotTable title="Usuarios CRM / Kommo" rows={userSlots} highlight />
-            <SlotTable title="WhatsApp / Bloqueos" rows={whatsappSlots} />
-            <SlotTable title="Otros bloques" rows={extraSlots} />
+            <PorAsignarPanel total={sheetConfig.porAsignarTotal ?? kpis.totalCurrent} onChange={updatePorAsignar} />
+            <SlotTable title="Usuarios CRM / Kommo" rows={userSlots} highlight onChange={(id, key, value) => updateSlot("userSlots", id, key, value)} />
+            <SlotTable title="WhatsApp / Bloqueos" rows={whatsappSlots} onChange={(id, key, value) => updateSlot("whatsappSlots", id, key, value)} />
+            <SlotTable title="Otros bloques" rows={extraSlots} onChange={(id, key, value) => updateSlot("extraSlots", id, key, value)} />
           </div>
 
           <div className="board-excel-center card">
@@ -328,9 +381,9 @@ export function CommercialBoardView() {
           </div>
 
           <div className="board-excel-right card">
-            <SocialMatrix matrix={socialMatrix} />
-            <ApiSummary buckets={apiBuckets} />
-            <CutSchedule blocks={cutBlocks} mode={mode} />
+            <SocialMatrix matrix={socialMatrix} onChange={updateSocialCell} />
+            <ApiSummary buckets={apiBuckets} onChange={updateApiBucket} />
+            <CutSchedule blocks={cutBlocks} mode={mode} onChange={updateCutBlock} />
           </div>
         </section>
       ) : null}
@@ -371,16 +424,26 @@ export function CommercialBoardView() {
   );
 }
 
-function PorAsignarPanel({ total }: { total: number }) {
+function PorAsignarPanel({ total, onChange }: { total: number; onChange: (value: number) => void }) {
   return (
     <div className="por-asignar-panel">
       <div className="por-asignar-label">POR ASIGNAR</div>
-      <div className="por-asignar-value">{total}</div>
+      <input className="por-asignar-value editable-cell" type="number" value={total} onChange={(event) => onChange(Number(event.target.value))} aria-label="Total por asignar" />
     </div>
   );
 }
 
-function SlotTable({ title, rows, highlight = false }: { title: string; rows: UserSlot[]; highlight?: boolean }) {
+function SlotTable({
+  title,
+  rows,
+  highlight = false,
+  onChange
+}: {
+  title: string;
+  rows: UserSlot[];
+  highlight?: boolean;
+  onChange: (id: string, key: keyof UserSlot, value: string | number) => void;
+}) {
   return (
     <div className="slot-block">
       <div className="slot-title">{title}</div>
@@ -388,11 +451,14 @@ function SlotTable({ title, rows, highlight = false }: { title: string; rows: Us
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <th>{row.code}</th>
-              <td>{row.range || row.count}</td>
-              <td className={row.status ? "restricted-cell" : ""}>{row.status || row.primary}</td>
-              {highlight ? <td>{row.secondary}</td> : null}
-              {highlight ? <td className="number-cell">{row.count}</td> : null}
+              <th><input className="editable-cell code-cell" value={row.code} onChange={(event) => onChange(row.id, "code", event.target.value)} /></th>
+              <td><input className="editable-cell" value={row.range} onChange={(event) => onChange(row.id, "range", event.target.value)} /></td>
+              <td className={row.status ? "restricted-cell" : ""}>
+                <input className="editable-cell" value={row.primary} onChange={(event) => onChange(row.id, "primary", event.target.value)} />
+              </td>
+              {highlight ? <td><input className="editable-cell" value={row.secondary} onChange={(event) => onChange(row.id, "secondary", event.target.value)} /></td> : null}
+              <td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={row.count} onChange={(event) => onChange(row.id, "count", Number(event.target.value))} /></td>
+              {!highlight ? <td><input className="editable-cell" value={row.status ?? ""} onChange={(event) => onChange(row.id, "status", event.target.value)} placeholder="Estado" /></td> : null}
             </tr>
           ))}
         </tbody>
@@ -440,37 +506,37 @@ function ExcelMainTable({ rows, onEdit }: { rows: BoardRow[]; onEdit: (row: Boar
   );
 }
 
-function SocialMatrix({ matrix }: { matrix: Record<string, Record<string, number>> }) {
+function SocialMatrix({ matrix, onChange }: { matrix: Record<string, Record<string, number>>; onChange: (row: string, column: string, value: number) => void }) {
   return (
     <div className="sheet-side-section">
       <h3>REDES SOCIALES</h3>
       <table className="excel-mini-table matrix-table">
         <thead><tr><th></th>{sourceColumns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
         <tbody>
-          {sourceRows.map((row) => <tr key={row}><th>{row}</th>{sourceColumns.map((column) => <td key={column} className="number-cell">{matrix[row]?.[column] ?? 0}</td>)}</tr>)}
+          {sourceRows.map((row) => <tr key={row}><th>{row}</th>{sourceColumns.map((column) => <td key={column} className="number-cell"><input className="editable-cell numeric-edit" type="number" value={matrix[row]?.[column] ?? 0} onChange={(event) => onChange(row, column, Number(event.target.value))} /></td>)}</tr>)}
         </tbody>
       </table>
     </div>
   );
 }
 
-function ApiSummary({ buckets }: { buckets: ApiBucket[] }) {
+function ApiSummary({ buckets, onChange }: { buckets: ApiBucket[]; onChange: (index: number, key: keyof ApiBucket, value: string | number) => void }) {
   return (
     <div className="sheet-side-section">
       <table className="excel-mini-table api-table">
         <thead><tr><th>API</th><th>Total</th><th></th></tr></thead>
-        <tbody>{buckets.map((bucket) => <tr key={bucket.api}><td>{bucket.api}</td><td>{bucket.label}</td><td className="number-cell">{bucket.total}</td></tr>)}</tbody>
+        <tbody>{buckets.map((bucket, index) => <tr key={`${bucket.api}-${index}`}><td><input className="editable-cell code-cell" value={bucket.api} onChange={(event) => onChange(index, "api", event.target.value)} /></td><td><input className="editable-cell" value={bucket.label} onChange={(event) => onChange(index, "label", event.target.value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={bucket.total} onChange={(event) => onChange(index, "total", Number(event.target.value))} /></td></tr>)}</tbody>
       </table>
     </div>
   );
 }
 
-function CutSchedule({ blocks, mode }: { blocks: CutBlock[]; mode: SheetMode }) {
+function CutSchedule({ blocks, mode, onChange }: { blocks: CutBlock[]; mode: SheetMode; onChange: (index: number, key: keyof CutBlock, value: string | number) => void }) {
   const key = mode === "semana" ? "weekdayGoal" : "weekendGoal";
   return (
     <div className="sheet-side-section cuts-section">
       <h3>{mode === "semana" ? "CORTES DE SEMANA" : "CORTES FIN DE SEMANA"}</h3>
-      <table className="cut-table"><tbody>{blocks.map((block) => <tr key={block.label}><td>{block.label}</td><td className="number-cell">{block[key] || ""}</td></tr>)}</tbody></table>
+      <table className="cut-table"><tbody>{blocks.map((block, index) => <tr key={`${block.label}-${index}`}><td><input className="editable-cell" value={block.label} onChange={(event) => onChange(index, "label", event.target.value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={Number(block[key] ?? 0)} onChange={(event) => onChange(index, key, Number(event.target.value))} /></td></tr>)}</tbody></table>
     </div>
   );
 }
@@ -530,6 +596,22 @@ function AlertsView({ alerts, rows }: { alerts: string[]; rows: BoardRow[] }) {
 
 function ConfigView() {
   return <section className="card board-detail-section"><div className="sheet-title-row"><div><p className="eyebrow">Configuracion</p><h3>Reglas de la pizarra</h3></div></div><div className="config-grid"><article><strong>Objetivo base</strong><span>70 llamadas diarias por fila operativa.</span></article><article><strong>Prioridad Alta</strong><span>Evento próximo, avance bajo o alto volumen de leads.</span></article><article><strong>Cortes</strong><span>8:00 AM, 12:00 PM, 2:30 PM, 5:00 PM, 7:00 PM y 8:45 PM.</span></article><article><strong>Kommo</strong><span>Preparado para alimentar leads, llamadas, mensajes y responsables desde CRM.</span></article></div></section>;
+}
+
+function normalizeSheetConfig(value: any) {
+  return {
+    porAsignarTotal: Number(value?.porAsignarTotal ?? 25),
+    userSlots: Array.isArray(value?.userSlots) ? value.userSlots : defaultUserSlots,
+    whatsappSlots: Array.isArray(value?.whatsappSlots) ? value.whatsappSlots : defaultWhatsappSlots,
+    extraSlots: Array.isArray(value?.extraSlots) ? value.extraSlots : defaultExtraSlots,
+    socialMatrix: value?.socialMatrix ?? {
+      F: { C: 0, D: 0, OBST: 0 },
+      IG: { C: 0, D: 0, OBST: 0 },
+      TIKTOK: { C: 0, D: 0, OBST: 0 }
+    },
+    apiBuckets: Array.isArray(value?.apiBuckets) ? value.apiBuckets : defaultApiBuckets,
+    cutBlocks: Array.isArray(value?.cutBlocks) ? value.cutBlocks : defaultCutBlocks
+  };
 }
 
 function MetricCard({ icon, label, value, helper }: { icon: ReactNode; label: string; value: string; helper: string }) {

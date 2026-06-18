@@ -14,6 +14,9 @@ export const permissionCatalog: ModulePermission[] = [
   { id: "products.generate_templates", module: "Productos y Eventos", submodule: "Plantillas informativas" },
   { id: "products.import_from_template", module: "Productos y Eventos", submodule: "Importar desde plantilla" },
   { id: "products.view_audit", module: "Productos y Eventos", submodule: "Historial de cambios" },
+  { id: "board.view", module: "Pizarra Comercial", submodule: "Vista diaria y ejecutiva" },
+  { id: "board.manage", module: "Pizarra Comercial", submodule: "Asignar leads y prioridades" },
+  { id: "board.config", module: "Pizarra Comercial", submodule: "Configuracion e importacion" },
   { id: "ranking.executives", module: "Ranking", submodule: "Ranking de ejecutivos" },
   { id: "teams.view", module: "Equipos", submodule: "Ventas por equipo" },
   { id: "executives.manage", module: "Ejecutivos", submodule: "Directorio comercial" },
@@ -216,12 +219,12 @@ export const defaultIncidentCriteria: IncidentCriteria = {
 
 export const defaultRolePermissions: RolePermissionConfig[] = [
   { role: "Superadministrador", permissions: permissionCatalog.map((item) => item.id) },
-  { role: "Administrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "products.view", "products.create", "products.edit", "products.archive", "products.activate", "products.manage_prices", "products.manage_links", "products.generate_templates", "products.import_from_template", "products.view_audit", "ranking.executives", "teams.view", "executives.manage", "incidents.view", "incidents.create", "incidents.manage", "incidents.export", "incidents.criteria", "goals.manage", "training.view", "training.manage", "customer-map.view", "reports.export", "notifications.view", "notifications.manage"] },
-  { role: "Jefe de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "products.view", "products.edit", "products.generate_templates", "ranking.executives", "teams.view", "executives.manage", "incidents.view", "incidents.create", "incidents.manage", "incidents.export", "goals.manage", "training.view", "training.manage", "customer-map.view", "reports.export", "notifications.view", "notifications.manage"] },
-  { role: "Lider de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "products.view", "ranking.executives", "teams.view", "incidents.view", "incidents.create", "training.view", "customer-map.view", "reports.export", "notifications.view"] },
-  { role: "Ejecutivo", permissions: ["dashboard.resumen", "sales.new", "products.view", "ranking.executives", "teams.view", "incidents.view", "training.view", "customer-map.view", "notifications.view"] },
-  { role: "Marketing", permissions: ["dashboard.resumen", "products.view", "products.create", "products.edit", "products.manage_links", "products.generate_templates", "products.import_from_template", "products.view_audit", "ranking.executives", "teams.view", "training.view", "customer-map.view", "reports.export", "notifications.view"] },
-  { role: "Solo lectura", permissions: ["dashboard.resumen", "products.view", "ranking.executives", "teams.view", "incidents.view", "training.view", "customer-map.view", "reports.export", "notifications.view"] }
+  { role: "Administrador", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "products.view", "products.create", "products.edit", "products.archive", "products.activate", "products.manage_prices", "products.manage_links", "products.generate_templates", "products.import_from_template", "products.view_audit", "board.view", "board.manage", "board.config", "ranking.executives", "teams.view", "executives.manage", "incidents.view", "incidents.create", "incidents.manage", "incidents.export", "incidents.criteria", "goals.manage", "training.view", "training.manage", "customer-map.view", "reports.export", "notifications.view", "notifications.manage"] },
+  { role: "Jefe de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "products.view", "products.edit", "products.generate_templates", "board.view", "board.manage", "board.config", "ranking.executives", "teams.view", "executives.manage", "incidents.view", "incidents.create", "incidents.manage", "incidents.export", "goals.manage", "training.view", "training.manage", "customer-map.view", "reports.export", "notifications.view", "notifications.manage"] },
+  { role: "Lider de ventas", permissions: ["dashboard.resumen", "sales.new", "sales.validation", "products.view", "board.view", "board.manage", "ranking.executives", "teams.view", "incidents.view", "incidents.create", "training.view", "customer-map.view", "reports.export", "notifications.view"] },
+  { role: "Ejecutivo", permissions: ["dashboard.resumen", "sales.new", "products.view", "board.view", "ranking.executives", "teams.view", "incidents.view", "training.view", "customer-map.view", "notifications.view"] },
+  { role: "Marketing", permissions: ["dashboard.resumen", "products.view", "products.create", "products.edit", "products.manage_links", "products.generate_templates", "products.import_from_template", "products.view_audit", "board.view", "board.manage", "ranking.executives", "teams.view", "training.view", "customer-map.view", "reports.export", "notifications.view"] },
+  { role: "Solo lectura", permissions: ["dashboard.resumen", "products.view", "board.view", "ranking.executives", "teams.view", "incidents.view", "training.view", "customer-map.view", "reports.export", "notifications.view"] }
 ];
 
 export function normalizeRoleLabel(role = "") {
