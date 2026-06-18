@@ -137,7 +137,7 @@
 
 .board-excel-grid {
   display: grid;
-  grid-template-columns: minmax(230px, 290px) minmax(560px, 1fr) minmax(260px, 340px);
+  grid-template-columns: minmax(360px, 1.05fr) minmax(360px, 0.95fr);
   gap: 14px;
   align-items: start;
 }
@@ -622,7 +622,7 @@
   }
 
   .board-excel-grid {
-    grid-template-columns: 260px 1fr 300px;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
 

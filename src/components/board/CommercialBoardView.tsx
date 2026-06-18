@@ -372,14 +372,6 @@ export function CommercialBoardView() {
             <SlotTable title="Otros bloques" rows={extraSlots} onChange={(id, key, value) => updateSlot("extraSlots", id, key, value)} />
           </div>
 
-          <div className="board-excel-center card">
-            <div className="sheet-title-row">
-              <div><p className="eyebrow">Pizarra operativa</p><h3>Eventos por ejecutivo</h3></div>
-              <span className="sheet-chip"><Filter size={14} /> {filteredRows.length} filas</span>
-            </div>
-            <ExcelMainTable rows={filteredRows} onEdit={openEditor} />
-          </div>
-
           <div className="board-excel-right card">
             <SocialMatrix matrix={socialMatrix} onChange={updateSocialCell} />
             <ApiSummary buckets={apiBuckets} onChange={updateApiBucket} />
