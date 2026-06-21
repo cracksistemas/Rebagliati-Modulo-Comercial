@@ -535,6 +535,7 @@ function EditableSelectCell({
 function ApiSummary({ buckets, options, onChange }: { buckets: ApiBucket[]; options: BoardSelectOptions; onChange: (index: number, key: keyof ApiBucket, value: string | number) => void }) {
   return (
     <div className="sheet-side-section">
+      <h3>API / Campañas</h3>
       <table className="excel-mini-table api-table">
         <thead><tr><th>API</th><th>Total</th><th></th></tr></thead>
         <tbody>{buckets.map((bucket, index) => <tr key={`${bucket.api}-${index}`}><td><EditableSelectCell value={bucket.api} options={options.apiCodes} label="codigo API" className="code-cell" onChange={(value) => onChange(index, "api", value)} /></td><td><EditableSelectCell value={bucket.label} options={options.apiLabels} label="bloque API" onChange={(value) => onChange(index, "label", value)} /></td><td className="number-cell"><input className="editable-cell numeric-edit" type="number" value={bucket.total} onChange={(event) => onChange(index, "total", Number(event.target.value))} /></td></tr>)}</tbody>
