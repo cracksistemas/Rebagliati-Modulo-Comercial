@@ -31,8 +31,9 @@ function getErrorMessage(error: unknown, fallback = "No se pudo cargar opciones 
 
 async function loadOptions() {
   const admin = createAdminClient();
-  const programSelect =
+  const legacyProgramSelect =
     "id,name,product_type,active,created_at,code,base_product_name,edition_name,area,status,modality,start_date,end_date,duration_value,duration_unit,class_days,schedule_summary,academic_hours,credits,certification_type,certifying_institution,allied_institutions,target_audience,allowed_profiles,short_description,commercial_description,academic_owner,commercial_owner,price_from,enrollment_amount,monthly_amount,monthly_count,single_payment_amount,certificate_amount,promo_name,promo_valid_until,form_url,whatsapp_group_url,zoom_url,campus_url,brochure_url,image_url,video_url,template_text,template_variants,sessions,price_tiers,change_log,updated_at";
+  const programSelect = `${legacyProgramSelect},access_config,academic_config`;
   const [programsResult, discountsResult, optionsResult] = await Promise.all([
     admin.from("sales_programs").select(programSelect).order("created_at", { ascending: false }),
     admin.from("authorized_discounts").select("id,label,amount,discount_type,active,requires_approval").eq("active", true).order("created_at", { ascending: true }),
@@ -41,9 +42,14 @@ async function loadOptions() {
 
   let programRows = programsResult.data as any[] | null;
   if (programsResult.error) {
-    const fallback = await admin.from("sales_programs").select("id,name,product_type,active,created_at").order("created_at", { ascending: false });
-    if (fallback.error) throw fallback.error;
-    programRows = fallback.data as any[];
+    const compatibleFallback = await admin.from("sales_programs").select(legacyProgramSelect).order("created_at", { ascending: false });
+    if (compatibleFallback.error) {
+      const basicFallback = await admin.from("sales_programs").select("id,name,product_type,active,created_at").order("created_at", { ascending: false });
+      if (basicFallback.error) throw basicFallback.error;
+      programRows = basicFallback.data as any[];
+    } else {
+      programRows = compatibleFallback.data as any[];
+    }
   }
   if (discountsResult.error) throw discountsResult.error;
 
@@ -165,25 +171,21 @@ export async function POST(request: NextRequest) {
       }, payload.program, guard.userId);
       const { error } = await admin.from("sales_programs").insert(insertRow);
       if (error) {
-        const fallback = await admin.from("sales_programs").insert({
-          id: insertRow.id,
-          name,
-          product_type: payload.productType,
-          active: insertRow.active,
-          created_by: guard.userId
-        });
-        if (fallback.error) throw fallback.error;
+        const compatibleFallback = await admin.from("sales_programs").insert(withoutAcademicAccessFields(insertRow));
+        if (compatibleFallback.error) {
+          const basicFallback = await admin.from("sales_programs").insert({ id: insertRow.id, name, product_type: payload.productType, active: insertRow.active, created_by: guard.userId });
+          if (basicFallback.error) throw basicFallback.error;
+        }
       }
     } else if (payload.program) {
       const updateRow = buildProgramRow({}, { ...payload.program, id: existing.id, name, productType: payload.productType }, guard.userId, true);
       const { error } = await admin.from("sales_programs").update(updateRow).eq("id", existing.id);
       if (error) {
-        const fallback = await admin.from("sales_programs").update({
-          name,
-          product_type: payload.productType,
-          active: updateRow.active
-        }).eq("id", existing.id);
-        if (fallback.error) throw fallback.error;
+        const compatibleFallback = await admin.from("sales_programs").update(withoutAcademicAccessFields(updateRow)).eq("id", existing.id);
+        if (compatibleFallback.error) {
+          const basicFallback = await admin.from("sales_programs").update({ name, product_type: payload.productType, active: updateRow.active }).eq("id", existing.id);
+          if (basicFallback.error) throw basicFallback.error;
+        }
       }
     }
 
@@ -225,6 +227,8 @@ function mapProgramRow(item: any): SalesProgram {
     commercialDescription: item.description_commercial ?? item.commercial_description,
     academicOwner: item.academic_owner,
     commercialOwner: item.commercial_owner,
+    accessConfig: item.access_config ?? undefined,
+    academicConfig: item.academic_config ?? undefined,
     priceFrom: numeric(item.price_from),
     enrollmentAmount: numeric(item.enrollment_amount),
     monthlyAmount: numeric(item.monthly_amount),
@@ -251,6 +255,13 @@ function mapProgramRow(item: any): SalesProgram {
 function numeric(value: unknown) {
   if (value === null || value === undefined || value === "") return undefined;
   return Number(value);
+}
+
+function withoutAcademicAccessFields(row: Record<string, any>) {
+  const copy = { ...row };
+  delete copy.access_config;
+  delete copy.academic_config;
+  return copy;
 }
 
 function buildProgramRow(base: Record<string, any>, program: Partial<SalesProgram> = {}, userId: string, update = false) {
@@ -283,6 +294,8 @@ function buildProgramRow(base: Record<string, any>, program: Partial<SalesProgra
     commercial_description: program.commercialDescription || null,
     academic_owner: program.academicOwner || null,
     commercial_owner: program.commercialOwner || null,
+    access_config: program.accessConfig ?? {},
+    academic_config: program.academicConfig ?? {},
     price_from: program.priceFrom ?? null,
     enrollment_amount: program.enrollmentAmount ?? null,
     monthly_amount: program.monthlyAmount ?? null,

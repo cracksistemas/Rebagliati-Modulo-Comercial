@@ -86,6 +86,7 @@ export function SalesNewView() {
   );
   const activeDiscounts = useMemo(() => state.discounts.filter((discount) => discount.active), [state.discounts]);
   const selectedDiscount = activeDiscounts.find((discount) => discount.id === selectedDiscountId);
+  const selectedProgram = state.programs.find((program) => program.id === sale.productId);
   const currentExecutive = executives.find((item) => item.id === sale.executiveId);
   const currentTeam = state.teams.find((team) => team.id === sale.teamId);
   const duplicateParticipant = useMemo(() => findDuplicateParticipant(state.sales, sale), [state.sales, sale]);
@@ -192,7 +193,24 @@ export function SalesNewView() {
         certificateAmount: program.certificateAmount,
         totalProgramAmount: calculateProgramTotal(program) || price
       },
-      notes: [sale.notes, program.formUrl ? `Formulario del programa: ${program.formUrl}` : ""].filter(Boolean).join("\n")
+      modalityDetails: {
+        ...sale.modalityDetails,
+        platform: program.campusUrl ?? sale.modalityDetails?.platform,
+        accessMode: program.accessConfig?.admissionMode,
+        accessReleaseRule: program.accessConfig?.releaseRule,
+        accessDurationDays: program.accessConfig?.accessDurationDays,
+        credentialDelivery: program.accessConfig?.credentialDelivery,
+        welcomeChannel: program.accessConfig?.welcomeChannel,
+        moduleCount: program.academicConfig?.moduleCount,
+        sessionCount: program.academicConfig?.sessionCount,
+        evaluationRequired: program.academicConfig?.evaluationRequired
+      },
+      followups: buildProgramFollowups(program),
+      notes: [
+        sale.notes,
+        program.formUrl ? `Formulario del programa: ${program.formUrl}` : "",
+        program.accessConfig?.releaseRule ? `Acceso al aula: ${program.accessConfig.releaseRule}.` : ""
+      ].filter(Boolean).join("\n")
     });
   }
 
@@ -489,6 +507,15 @@ export function SalesNewView() {
           <Field label="Fecha de término"><input type="date" value={sale.endDate ?? ""} onChange={(event) => update("endDate", event.target.value)} /></Field>
           <Field label="Duración"><input value={sale.duration ?? ""} onChange={(event) => update("duration", event.target.value)} /></Field>
           <Field label="Horario"><input value={sale.schedule ?? ""} onChange={(event) => update("schedule", event.target.value)} /></Field>
+          {selectedProgram ? (
+            <div className="sales-program-operations">
+              <span><strong>{selectedProgram.accessConfig?.releaseRule || "Acceso por confirmar"}</strong><small>Habilitación</small></span>
+              <span><strong>{selectedProgram.accessConfig?.admissionMode || "Pendiente"}</strong><small>Ingreso al aula</small></span>
+              <span><strong>{selectedProgram.academicConfig?.moduleCount || 0}</strong><small>Módulos</small></span>
+              <span><strong>{selectedProgram.academicConfig?.sessionCount || 0}</strong><small>Clases</small></span>
+              <span><strong>{selectedProgram.academicConfig?.materialsDeliveryMode || "Pendiente"}</strong><small>Materiales</small></span>
+            </div>
+          ) : null}
           {renderModalityFields(sale, updateModalityDetail)}
         </FormSection>
 
@@ -722,6 +749,19 @@ function calculateProgramTotal(program: SalesProgram) {
   const certificate = Number(program.certificateAmount ?? 0);
   const single = Number(program.singlePaymentAmount ?? 0);
   return single || enrollment + monthly * count + certificate;
+}
+
+function buildProgramFollowups(program: SalesProgram) {
+  const followups = [
+    program.accessConfig?.requiresValidatedPayment ? "Confirmar pago validado antes de habilitar acceso" : "Confirmar inscripción",
+    program.accessConfig?.credentialDelivery !== "No aplica" ? "Crear o enviar credenciales del aula virtual" : "",
+    program.accessConfig?.welcomeChannel && program.accessConfig.welcomeChannel !== "Sin mensaje automático" ? `Enviar bienvenida por ${program.accessConfig.welcomeChannel}` : "",
+    program.whatsappGroupUrl ? "Enviar enlace del grupo de WhatsApp" : "",
+    program.academicConfig?.materialsDeliveryMode ? `Programar materiales: ${program.academicConfig.materialsDeliveryMode}` : "",
+    program.academicConfig?.evaluationRequired ? "Informar evaluación y nota mínima aprobatoria" : "",
+    "Confirmar que el participante pudo ingresar"
+  ].filter(Boolean);
+  return Array.from(new Set(followups));
 }
 
 function sameText(left: string, right: string) {

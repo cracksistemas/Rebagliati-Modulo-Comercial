@@ -184,6 +184,23 @@ export type SalesProgram = {
   commercialDescription?: string;
   academicOwner?: string;
   commercialOwner?: string;
+  accessConfig?: {
+    admissionMode?: string;
+    releaseRule?: string;
+    accessDurationDays?: number;
+    requiresValidatedPayment?: boolean;
+    credentialDelivery?: string;
+    welcomeChannel?: string;
+  };
+  academicConfig?: {
+    moduleCount?: number;
+    sessionCount?: number;
+    materialsDeliveryMode?: string;
+    evaluationRequired?: boolean;
+    minimumPassingGrade?: number;
+    certificateRule?: string;
+    progressTracking?: string;
+  };
   priceFrom?: number;
   enrollmentAmount?: number;
   monthlyAmount?: number;

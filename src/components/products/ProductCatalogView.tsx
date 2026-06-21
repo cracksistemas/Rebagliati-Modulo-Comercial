@@ -17,6 +17,8 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ButtonHelp } from "@/components/help/ButtonHelp";
+import { FieldLabel } from "@/components/help/FieldLabel";
 import { getCommercialState, money, setCommercialState } from "@/lib/commercial/store";
 import type { ProductType, Sale, SalesProgram } from "@/lib/commercial/types";
 
@@ -50,30 +52,23 @@ const emptyFilters: CatalogFilters = {
   formStatus: ""
 };
 
-const productTypeOptions: ProductType[] = [
-  "Diplomado",
-  "Diplomado intensivo",
-  "Diplomado internacional",
-  "Curso",
-  "Curso online",
-  "Curso intensivo",
-  "Curso Modular",
-  "Taller",
-  "Seminario",
-  "Practica interactiva",
-  "Certifícate",
-  "Webinar",
-  "Evento gratuito",
-  "Asincrónico",
-  "Otro"
-];
+const productTypeOptions: ProductType[] = ["Diplomado", "Curso", "Tecnico", "Profesionales", "Otro"];
 
 const statusOptions = ["Borrador", "En revision", "Activo para ventas", "Pausado", "Cerrado", "Archivado", "Cancelado"];
 const modalityOptions = ["Virtual", "Asincrónico", "Presencial", "Semipresencial", "Híbrido", "Asincrónico y virtual"];
 const durationUnits = ["Días", "Semanas", "Meses", "Horas", "Sesiones"];
 const institutions = ["UNASAM", "Barton", "Rebagliati Diplomados", "CRE XXIV Lima Provincias", "CRO Huaraz", "ANEOP", "FED - CUT ESSALUD", "Otra"];
 const audienceOptions = ["Médicos", "Licenciados", "Técnicos", "Estudiantes", "Profesionales de salud", "Profesionales de enfermería", "Profesionales de obstetricia", "Público en general", "Conductores de ambulancia", "Técnicos en farmacia", "Otro"];
-const wizardSteps = ["General", "Fechas", "Certificación", "Público", "Tarifas", "Links", "Plantilla", "Revisión"];
+const wizardSteps = ["General", "Fechas", "Acceso", "Estructura", "Certificación", "Público", "Tarifas", "Links", "Plantilla", "Revisión"];
+
+const classDayOptions = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+
+type CatalogSelectOptions = {
+  productTypes: string[];
+  commercialOwners: string[];
+  academicOwners: string[];
+  audiences: string[];
+};
 
 function createDraft(base?: Partial<SalesProgram>): SalesProgram {
   const now = new Date().toISOString();
@@ -81,7 +76,7 @@ function createDraft(base?: Partial<SalesProgram>): SalesProgram {
     id: base?.id ?? `program-${crypto.randomUUID()}`,
     name: base?.name ?? "",
     baseProductName: base?.baseProductName ?? base?.name ?? "",
-    editionName: base?.editionName ?? "Edición comercial",
+    editionName: base?.editionName ?? "",
     code: base?.code ?? "",
     productType: base?.productType ?? "Curso",
     area: base?.area ?? "",
@@ -103,6 +98,23 @@ function createDraft(base?: Partial<SalesProgram>): SalesProgram {
     commercialDescription: base?.commercialDescription ?? "",
     academicOwner: base?.academicOwner ?? "",
     commercialOwner: base?.commercialOwner ?? "",
+    accessConfig: {
+      admissionMode: base?.accessConfig?.admissionMode ?? "Correo y contraseña",
+      releaseRule: base?.accessConfig?.releaseRule ?? "Pago validado",
+      accessDurationDays: base?.accessConfig?.accessDurationDays ?? 365,
+      requiresValidatedPayment: base?.accessConfig?.requiresValidatedPayment ?? true,
+      credentialDelivery: base?.accessConfig?.credentialDelivery ?? "Automática",
+      welcomeChannel: base?.accessConfig?.welcomeChannel ?? "Correo y WhatsApp"
+    },
+    academicConfig: {
+      moduleCount: base?.academicConfig?.moduleCount ?? 1,
+      sessionCount: base?.academicConfig?.sessionCount ?? 1,
+      materialsDeliveryMode: base?.academicConfig?.materialsDeliveryMode ?? "Por módulo",
+      evaluationRequired: base?.academicConfig?.evaluationRequired ?? false,
+      minimumPassingGrade: base?.academicConfig?.minimumPassingGrade ?? 13,
+      certificateRule: base?.academicConfig?.certificateRule ?? "Pago completo y evaluación aprobada",
+      progressTracking: base?.academicConfig?.progressTracking ?? "Por clases y materiales"
+    },
     priceFrom: base?.priceFrom ?? 0,
     enrollmentAmount: base?.enrollmentAmount ?? 0,
     monthlyAmount: base?.monthlyAmount ?? 0,
@@ -162,6 +174,7 @@ export function ProductCatalogView() {
   const incompletePricing = programs.filter((program) => !hasValidPrice(program)).length;
   const withoutForm = programs.filter((program) => isActiveForSales(program) && !program.formUrl).length;
   const promoWarnings = programs.filter((program) => program.promoValidUntil && program.promoValidUntil < new Date().toISOString().slice(0, 10)).length;
+  const catalogSelectOptions = useMemo(() => buildCatalogSelectOptions(state), [state]);
 
   function sync(nextPrograms: SalesProgram[]) {
     const next = { ...state, programs: nextPrograms };
@@ -296,7 +309,7 @@ export function ProductCatalogView() {
 
       <div className="products-kpis">
         <Kpi label="Activos para ventas" value={activeForSales.length} detail="Visibles en Registrar venta" />
-        <Kpi label="Ediciones registradas" value={programs.length} detail="Base + edición comercial" />
+        <Kpi label="Productos registrados" value={programs.length} detail="Cursos, diplomados y eventos" />
         <Kpi label="Tarifas incompletas" value={incompletePricing} detail="No deben activarse" warning={incompletePricing > 0} />
         <Kpi label="Sin formulario" value={withoutForm} detail="Revisar links" warning={withoutForm > 0} />
         <Kpi label="Promos vencidas" value={promoWarnings} detail="Actualizar precio regular" warning={promoWarnings > 0} />
@@ -363,7 +376,7 @@ export function ProductCatalogView() {
                     <td>
                       <div className="product-name-cell">
                         <span>{program.name}</span>
-                        <small>{program.editionName || program.baseProductName || "Edición comercial"}</small>
+                        <small>{program.baseProductName || program.area || "Catálogo comercial"}</small>
                       </div>
                     </td>
                     <td>{program.productType}</td>
@@ -404,6 +417,7 @@ export function ProductCatalogView() {
           step={step}
           mode={modal}
           status={status}
+          options={catalogSelectOptions}
           onStep={setStep}
           onPatch={patchDraft}
           onClose={() => setModal(null)}
@@ -457,6 +471,7 @@ function EditProductModal({
   step,
   mode,
   status,
+  options,
   onStep,
   onPatch,
   onClose,
@@ -466,6 +481,7 @@ function EditProductModal({
   step: number;
   mode: "edit" | "duplicate";
   status: string;
+  options: CatalogSelectOptions;
   onStep: (step: number) => void;
   onPatch: (patch: Partial<SalesProgram>) => void;
   onClose: () => void;
@@ -478,7 +494,7 @@ function EditProductModal({
           <div>
             <p className="eyebrow">{mode === "duplicate" ? "Duplicar edición" : "Catálogo comercial"}</p>
             <h2>{mode === "duplicate" ? "Nueva edición desde producto existente" : "Crear / editar producto"}</h2>
-            <p className="muted">Completa la edición comercial que ventas podrá seleccionar cuando esté activa.</p>
+            <p className="muted">Configura el producto, su acceso al aula y la operación que ventas usará cuando esté activo.</p>
           </div>
           <button className="ghost-button" type="button" onClick={onClose}>Cerrar</button>
         </div>
@@ -488,14 +504,16 @@ function EditProductModal({
           ))}
         </div>
         <div className="product-modal-body">
-          {step === 0 ? <GeneralStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 0 ? <GeneralStep draft={draft} options={options} onPatch={onPatch} /> : null}
           {step === 1 ? <DatesStep draft={draft} onPatch={onPatch} /> : null}
-          {step === 2 ? <CertificationStep draft={draft} onPatch={onPatch} /> : null}
-          {step === 3 ? <AudienceStep draft={draft} onPatch={onPatch} /> : null}
-          {step === 4 ? <PricingStep draft={draft} onPatch={onPatch} /> : null}
-          {step === 5 ? <LinksStep draft={draft} onPatch={onPatch} /> : null}
-          {step === 6 ? <TemplateStep draft={draft} onPatch={onPatch} /> : null}
-          {step === 7 ? <ReviewStep draft={draft} /> : null}
+          {step === 2 ? <AccessStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 3 ? <AcademicStructureStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 4 ? <CertificationStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 5 ? <AudienceStep draft={draft} options={options} onPatch={onPatch} /> : null}
+          {step === 6 ? <PricingStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 7 ? <LinksStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 8 ? <TemplateStep draft={draft} onPatch={onPatch} /> : null}
+          {step === 9 ? <ReviewStep draft={draft} /> : null}
         </div>
         {status ? <span className="validation-toast">{status}</span> : null}
         <div className="sales-modal-actions">
@@ -503,7 +521,7 @@ function EditProductModal({
           {step < wizardSteps.length - 1 ? (
             <button className="primary-button" type="button" onClick={() => onStep(Math.min(step + 1, wizardSteps.length - 1))}>Siguiente</button>
           ) : (
-            <button className="primary-button" type="button" onClick={onSave}>Guardar catálogo</button>
+            <button className="primary-button" type="button" onClick={onSave}>Guardar catálogo <ButtonHelp helpKey="products.save_catalog" /></button>
           )}
         </div>
       </div>
@@ -511,33 +529,142 @@ function EditProductModal({
   );
 }
 
-function GeneralStep({ draft, onPatch }: StepProps) {
+function GeneralStep({ draft, options, onPatch }: StepProps & { options: CatalogSelectOptions }) {
   return (
     <div className="product-form-grid">
-      <Field label="Nombre del producto"><input value={draft.name} onChange={(event) => onPatch({ name: event.target.value })} /></Field>
-      <Field label="Código interno"><input value={draft.code ?? ""} onChange={(event) => onPatch({ code: event.target.value })} placeholder="D.SALUDOCUPACIONAL-0626" /></Field>
-      <Field label="Tipo de producto"><select value={draft.productType} onChange={(event) => onPatch({ productType: event.target.value })}>{productTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
-      <Field label="Área / rubro"><input value={draft.area ?? ""} onChange={(event) => onPatch({ area: event.target.value })} /></Field>
-      <Field label="Estado"><select value={draft.status ?? "Borrador"} onChange={(event) => onPatch({ status: event.target.value })}>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
-      <Field label="Edición comercial"><input value={draft.editionName ?? ""} onChange={(event) => onPatch({ editionName: event.target.value })} /></Field>
-      <Field label="Responsable académico"><input value={draft.academicOwner ?? ""} onChange={(event) => onPatch({ academicOwner: event.target.value })} /></Field>
-      <Field label="Responsable comercial"><input value={draft.commercialOwner ?? ""} onChange={(event) => onPatch({ commercialOwner: event.target.value })} /></Field>
-      <Field label="Descripción corta" wide><textarea value={draft.shortDescription ?? ""} onChange={(event) => onPatch({ shortDescription: event.target.value })} /></Field>
-      <Field label="Descripción comercial" wide><textarea value={draft.commercialDescription ?? ""} onChange={(event) => onPatch({ commercialDescription: event.target.value })} /></Field>
+      <Field label="Nombre del producto" helpKey="products.name"><input value={draft.name} onChange={(event) => onPatch({ name: event.target.value })} /></Field>
+      <Field label="Código interno" helpKey="products.code"><input value={draft.code ?? ""} onChange={(event) => onPatch({ code: event.target.value })} placeholder="D.SALUDOCUPACIONAL-0626" /></Field>
+      <Field label="Tipo de producto" helpKey="products.type">
+        <AddableSelect value={draft.productType} options={options.productTypes} addLabel="tipo de producto" onChange={(value) => onPatch({ productType: value })} />
+      </Field>
+      <Field label="Área / rubro" helpKey="products.area"><input value={draft.area ?? ""} onChange={(event) => onPatch({ area: event.target.value })} /></Field>
+      <Field label="Estado" helpKey="products.status"><select value={draft.status ?? "Borrador"} onChange={(event) => onPatch({ status: event.target.value })}>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
+      <Field label="Responsable académico" helpKey="products.academic_owner">
+        <AddableSelect value={draft.academicOwner ?? ""} options={options.academicOwners} addLabel="responsable academico" placeholder="Seleccionar o agregar" onChange={(value) => onPatch({ academicOwner: value })} />
+      </Field>
+      <Field label="Responsable comercial" helpKey="products.commercial_owner">
+        <AddableSelect value={draft.commercialOwner ?? ""} options={options.commercialOwners} addLabel="responsable comercial" placeholder="Seleccionar responsable" onChange={(value) => onPatch({ commercialOwner: value })} />
+      </Field>
+      <Field label="Descripción corta" helpKey="products.short_description" wide><textarea value={draft.shortDescription ?? ""} onChange={(event) => onPatch({ shortDescription: event.target.value })} /></Field>
+      <Field label="Descripción comercial" helpKey="products.commercial_description" wide><textarea value={draft.commercialDescription ?? ""} onChange={(event) => onPatch({ commercialDescription: event.target.value })} /></Field>
     </div>
   );
 }
 
 function DatesStep({ draft, onPatch }: StepProps) {
+  const [classDaysOpen, setClassDaysOpen] = useState(false);
+  const selectedDays = parseClassDays(draft.classDays ?? "");
+  function updateClassDays(days: string[]) {
+    onPatch({ classDays: days.join(", ") });
+  }
+
   return (
     <div className="product-form-grid">
-      <Field label="Fecha de inicio"><input type="date" value={draft.startDate ?? ""} onChange={(event) => onPatch({ startDate: event.target.value })} /></Field>
-      <Field label="Fecha de término"><input type="date" value={draft.endDate ?? ""} onChange={(event) => onPatch({ endDate: event.target.value })} /></Field>
-      <Field label="Duración"><input type="number" min={0} value={draft.durationValue || ""} onChange={(event) => onPatch({ durationValue: Number(event.target.value || 0) })} /></Field>
+      <Field label="Fecha de inicio" helpKey="products.start_date"><input type="date" value={draft.startDate ?? ""} onChange={(event) => onPatch({ startDate: event.target.value })} /></Field>
+      <Field label="Fecha de término" helpKey="products.end_date"><input type="date" value={draft.endDate ?? ""} onChange={(event) => onPatch({ endDate: event.target.value })} /></Field>
+      <Field label="Duración" helpKey="products.duration"><input type="number" min={0} value={draft.durationValue || ""} onChange={(event) => onPatch({ durationValue: Number(event.target.value || 0) })} /></Field>
       <Field label="Unidad"><select value={draft.durationUnit ?? "Horas"} onChange={(event) => onPatch({ durationUnit: event.target.value })}>{durationUnits.map((item) => <option key={item}>{item}</option>)}</select></Field>
-      <Field label="Días de clase"><input value={draft.classDays ?? ""} onChange={(event) => onPatch({ classDays: event.target.value })} /></Field>
-      <Field label="Modalidad"><select value={draft.modality ?? "Virtual"} onChange={(event) => onPatch({ modality: event.target.value })}>{modalityOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
-      <Field label="Horario resumen" wide><textarea value={draft.scheduleSummary ?? ""} onChange={(event) => onPatch({ scheduleSummary: event.target.value })} placeholder="Teoría: 05:00 PM a 09:00 PM / Taller: 05:00 PM a 08:00 PM" /></Field>
+      <Field label="Días de clase" helpKey="products.class_days">
+        <div className="field-action-row">
+          <input value={draft.classDays ?? ""} readOnly placeholder="Seleccionar días" />
+          <button className="ghost-button small" type="button" onClick={() => setClassDaysOpen(true)}>Elegir</button>
+        </div>
+      </Field>
+      <Field label="Modalidad" helpKey="products.modality"><select value={draft.modality ?? "Virtual"} onChange={(event) => onPatch({ modality: event.target.value })}>{modalityOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
+      <Field label="Horario resumen" helpKey="products.schedule" wide><textarea value={draft.scheduleSummary ?? ""} onChange={(event) => onPatch({ scheduleSummary: event.target.value })} placeholder="Teoría: 05:00 PM a 09:00 PM / Taller: 05:00 PM a 08:00 PM" /></Field>
+      {classDaysOpen ? (
+        <ClassDaysMiniModal
+          selected={selectedDays}
+          onChange={updateClassDays}
+          onClose={() => setClassDaysOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AccessStep({ draft, onPatch }: StepProps) {
+  const access = draft.accessConfig ?? {};
+  function patchAccess(patch: Partial<NonNullable<SalesProgram["accessConfig"]>>) {
+    onPatch({ accessConfig: { ...access, ...patch } });
+  }
+
+  return (
+    <div className="product-form-grid">
+      <Field label="Forma de ingreso al aula" helpKey="products.admission_mode">
+        <select value={access.admissionMode ?? "Correo y contraseña"} onChange={(event) => patchAccess({ admissionMode: event.target.value })}>
+          {["Correo y contraseña", "Enlace mágico", "Invitación por correo", "Código de matrícula", "Alta manual por administración"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <Field label="Habilitar acceso cuando" helpKey="products.release_rule">
+        <select value={access.releaseRule ?? "Pago validado"} onChange={(event) => patchAccess({ releaseRule: event.target.value })}>
+          {["Pago validado", "Matrícula validada", "Venta validada", "Fecha de inicio", "Autorización manual"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <Field label="Duración del acceso" helpKey="products.access_duration">
+        <div className="field-suffix-row">
+          <input type="number" min={1} value={access.accessDurationDays ?? 365} onChange={(event) => patchAccess({ accessDurationDays: Number(event.target.value || 0) })} />
+          <span>días</span>
+        </div>
+      </Field>
+      <Field label="Entrega de credenciales" helpKey="products.credential_delivery">
+        <select value={access.credentialDelivery ?? "Automática"} onChange={(event) => patchAccess({ credentialDelivery: event.target.value })}>
+          {["Automática", "Manual por administración", "No aplica"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <Field label="Canal de bienvenida" helpKey="products.welcome_channel">
+        <select value={access.welcomeChannel ?? "Correo y WhatsApp"} onChange={(event) => patchAccess({ welcomeChannel: event.target.value })}>
+          {["Correo y WhatsApp", "Solo correo", "Solo WhatsApp", "Llamada de bienvenida", "Sin mensaje automático"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <label className="product-toggle-card">
+        <input type="checkbox" checked={access.requiresValidatedPayment ?? true} onChange={(event) => patchAccess({ requiresValidatedPayment: event.target.checked })} />
+        <span><strong>Exigir pago validado</strong><small>Evita habilitar el aula con comprobantes observados o pendientes.</small></span>
+      </label>
+      <div className="product-flow-preview span-2">
+        <span>Flujo de acceso</span>
+        <strong>Venta → validación → {access.releaseRule ?? "Pago validado"} → credenciales → aula virtual</strong>
+      </div>
+    </div>
+  );
+}
+
+function AcademicStructureStep({ draft, onPatch }: StepProps) {
+  const academic = draft.academicConfig ?? {};
+  function patchAcademic(patch: Partial<NonNullable<SalesProgram["academicConfig"]>>) {
+    onPatch({ academicConfig: { ...academic, ...patch } });
+  }
+
+  return (
+    <div className="product-form-grid">
+      <Field label="Cantidad de módulos" helpKey="products.module_count"><input type="number" min={1} value={academic.moduleCount ?? 1} onChange={(event) => patchAcademic({ moduleCount: Number(event.target.value || 0) })} /></Field>
+      <Field label="Cantidad de clases" helpKey="products.session_count"><input type="number" min={1} value={academic.sessionCount ?? 1} onChange={(event) => patchAcademic({ sessionCount: Number(event.target.value || 0) })} /></Field>
+      <Field label="Entrega de materiales" helpKey="products.material_delivery">
+        <select value={academic.materialsDeliveryMode ?? "Por módulo"} onChange={(event) => patchAcademic({ materialsDeliveryMode: event.target.value })}>
+          {["Todo al iniciar", "Por módulo", "Después de cada clase", "Solo bajo solicitud", "No incluye materiales"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <Field label="Seguimiento de avance" helpKey="products.progress_tracking">
+        <select value={academic.progressTracking ?? "Por clases y materiales"} onChange={(event) => patchAcademic({ progressTracking: event.target.value })}>
+          {["Por clases y materiales", "Por módulos completados", "Solo asistencia", "Sin seguimiento"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <label className="product-toggle-card">
+        <input type="checkbox" checked={academic.evaluationRequired ?? false} onChange={(event) => patchAcademic({ evaluationRequired: event.target.checked })} />
+        <span><strong>Evaluación obligatoria</strong><small>El participante debe aprobar antes de completar el programa.</small></span>
+      </label>
+      <Field label="Nota mínima aprobatoria" helpKey="products.minimum_grade"><input type="number" min={0} max={20} disabled={!academic.evaluationRequired} value={academic.minimumPassingGrade ?? 13} onChange={(event) => patchAcademic({ minimumPassingGrade: Number(event.target.value || 0) })} /></Field>
+      <Field label="Condición para certificado" helpKey="products.certificate_rule" wide>
+        <select value={academic.certificateRule ?? "Pago completo y evaluación aprobada"} onChange={(event) => patchAcademic({ certificateRule: event.target.value })}>
+          {["Pago completo y evaluación aprobada", "Pago completo", "Asistencia y evaluación aprobada", "Finalizar todos los módulos", "Autorización manual"].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </Field>
+      <div className="product-structure-summary span-2">
+        <article><strong>{academic.moduleCount ?? 1}</strong><span>Módulos</span></article>
+        <article><strong>{academic.sessionCount ?? 1}</strong><span>Clases</span></article>
+        <article><strong>{academic.evaluationRequired ? `${academic.minimumPassingGrade ?? 13}/20` : "No"}</strong><span>Evaluación</span></article>
+        <article><strong>{academic.materialsDeliveryMode ?? "Por módulo"}</strong><span>Materiales</span></article>
+      </div>
     </div>
   );
 }
@@ -545,25 +672,39 @@ function DatesStep({ draft, onPatch }: StepProps) {
 function CertificationStep({ draft, onPatch }: StepProps) {
   return (
     <div className="product-form-grid">
-      <Field label="Horas académicas"><input type="number" min={0} value={draft.academicHours || ""} onChange={(event) => onPatch({ academicHours: Number(event.target.value || 0) })} /></Field>
-      <Field label="Créditos"><input type="number" min={0} value={draft.credits || ""} onChange={(event) => onPatch({ credits: Number(event.target.value || 0) })} /></Field>
-      <Field label="Tipo de certificación"><select value={draft.certificationType ?? "Institucional"} onChange={(event) => onPatch({ certificationType: event.target.value })}>{["Universitaria", "Técnica", "Institucional", "Constancia", "Certificación opcional", "Sin certificación"].map((item) => <option key={item}>{item}</option>)}</select></Field>
-      <Field label="Institución certificadora"><select value={draft.certifyingInstitution ?? "Rebagliati Diplomados"} onChange={(event) => onPatch({ certifyingInstitution: event.target.value })}>{institutions.map((item) => <option key={item}>{item}</option>)}</select></Field>
-      <Field label="Instituciones aliadas" wide><input value={draft.alliedInstitutions ?? ""} onChange={(event) => onPatch({ alliedInstitutions: event.target.value })} /></Field>
+      <Field label="Horas académicas" helpKey="products.academic_hours"><input type="number" min={0} value={draft.academicHours || ""} onChange={(event) => onPatch({ academicHours: Number(event.target.value || 0) })} /></Field>
+      <Field label="Créditos" helpKey="products.credits"><input type="number" min={0} value={draft.credits || ""} onChange={(event) => onPatch({ credits: Number(event.target.value || 0) })} /></Field>
+      <Field label="Tipo de certificación" helpKey="products.certification_type"><select value={draft.certificationType ?? "Institucional"} onChange={(event) => onPatch({ certificationType: event.target.value })}>{["Universitaria", "Técnica", "Institucional", "Constancia", "Certificación opcional", "Sin certificación"].map((item) => <option key={item}>{item}</option>)}</select></Field>
+      <Field label="Institución certificadora" helpKey="products.certifying_institution"><select value={draft.certifyingInstitution ?? "Rebagliati Diplomados"} onChange={(event) => onPatch({ certifyingInstitution: event.target.value })}>{institutions.map((item) => <option key={item}>{item}</option>)}</select></Field>
+      <Field label="Instituciones aliadas" helpKey="products.allied_institutions" wide><input value={draft.alliedInstitutions ?? ""} onChange={(event) => onPatch({ alliedInstitutions: event.target.value })} /></Field>
     </div>
   );
 }
 
-function AudienceStep({ draft, onPatch }: StepProps) {
+function AudienceStep({ draft, options, onPatch }: StepProps & { options: CatalogSelectOptions }) {
+  function setAllowedProfiles(nextProfiles: string[]) {
+    onPatch({
+      allowedProfiles: nextProfiles,
+      targetAudience: nextProfiles.filter((item) => item !== "Otro").join(", ")
+    });
+  }
+
+  function addAudience() {
+    const next = window.prompt("Agregar perfil permitido", "");
+    if (!next?.trim()) return;
+    setAllowedProfiles(uniqueStrings([...(draft.allowedProfiles ?? []), next.trim()]));
+  }
+
   return (
     <div className="product-form-grid">
-      <Field label="Dirigido a" wide><input value={draft.targetAudience ?? ""} onChange={(event) => onPatch({ targetAudience: event.target.value })} /></Field>
-      <Field label="Perfiles permitidos" wide>
+      <Field label="Dirigido a" helpKey="products.target_audience" wide><input value={draft.targetAudience ?? ""} onChange={(event) => onPatch({ targetAudience: event.target.value })} /></Field>
+      <Field label="Perfiles permitidos" helpKey="products.allowed_profiles" wide>
         <div className="chip-grid">
-          {audienceOptions.map((item) => {
+          {options.audiences.map((item) => {
             const active = draft.allowedProfiles?.includes(item);
-            return <button key={item} className={active ? "chip active" : "chip"} type="button" onClick={() => onPatch({ allowedProfiles: toggleValue(draft.allowedProfiles ?? [], item) })}>{item}</button>;
+            return <button key={item} className={active ? "chip active" : "chip"} type="button" onClick={() => item === "Otro" ? addAudience() : setAllowedProfiles(toggleValue(draft.allowedProfiles ?? [], item))}>{item}</button>;
           })}
+          <button className="chip chip-add" type="button" onClick={addAudience}><Plus size={14} /> Agregar</button>
         </div>
       </Field>
     </div>
@@ -573,12 +714,11 @@ function AudienceStep({ draft, onPatch }: StepProps) {
 function PricingStep({ draft, onPatch }: StepProps) {
   return (
     <div className="product-form-grid">
-      <Field label="Matrícula promocional"><input type="number" min={0} value={draft.enrollmentAmount || ""} onChange={(event) => onPatch({ enrollmentAmount: Number(event.target.value || 0) })} /></Field>
-      <Field label="Mensualidad promocional"><input type="number" min={0} value={draft.monthlyAmount || ""} onChange={(event) => onPatch({ monthlyAmount: Number(event.target.value || 0) })} /></Field>
-      <Field label="Cantidad mensualidades"><input type="number" min={0} value={draft.monthlyCount || ""} onChange={(event) => onPatch({ monthlyCount: Number(event.target.value || 0) })} /></Field>
-      <Field label="Pago único"><input type="number" min={0} value={draft.singlePaymentAmount || ""} onChange={(event) => onPatch({ singlePaymentAmount: Number(event.target.value || 0) })} /></Field>
-      <Field label="Diploma certificado"><input type="number" min={0} value={draft.certificateAmount || ""} onChange={(event) => onPatch({ certificateAmount: Number(event.target.value || 0) })} /></Field>
-      <Field label="Promoción válida hasta"><input type="date" value={draft.promoValidUntil ?? ""} onChange={(event) => onPatch({ promoValidUntil: event.target.value })} /></Field>
+      <Field label="Matrícula promocional" helpKey="products.enrollment"><input type="number" min={0} value={draft.enrollmentAmount || ""} onChange={(event) => onPatch({ enrollmentAmount: Number(event.target.value || 0) })} /></Field>
+      <Field label="Mensualidad promocional" helpKey="products.monthly"><input type="number" min={0} value={draft.monthlyAmount || ""} onChange={(event) => onPatch({ monthlyAmount: Number(event.target.value || 0) })} /></Field>
+      <Field label="Cantidad mensualidades" helpKey="products.monthly_count"><input type="number" min={0} value={draft.monthlyCount || ""} onChange={(event) => onPatch({ monthlyCount: Number(event.target.value || 0) })} /></Field>
+      <Field label="Pago único" helpKey="products.single_payment"><input type="number" min={0} value={draft.singlePaymentAmount || ""} onChange={(event) => onPatch({ singlePaymentAmount: Number(event.target.value || 0) })} /></Field>
+      <Field label="Promoción válida hasta" helpKey="products.promo_until"><input type="date" value={draft.promoValidUntil ?? ""} onChange={(event) => onPatch({ promoValidUntil: event.target.value })} /></Field>
       <Field label="Nombre de promoción" wide><input value={draft.promoName ?? ""} onChange={(event) => onPatch({ promoName: event.target.value })} /></Field>
       <div className="product-price-preview">
         <span>Precio desde</span>
@@ -591,12 +731,12 @@ function PricingStep({ draft, onPatch }: StepProps) {
 function LinksStep({ draft, onPatch }: StepProps) {
   return (
     <div className="product-form-grid">
-      <Field label="Formulario de inscripción" wide><input value={draft.formUrl ?? ""} onChange={(event) => onPatch({ formUrl: event.target.value })} /></Field>
-      <Field label="Grupo WhatsApp"><input value={draft.whatsappGroupUrl ?? ""} onChange={(event) => onPatch({ whatsappGroupUrl: event.target.value })} /></Field>
-      <Field label="Zoom"><input value={draft.zoomUrl ?? ""} onChange={(event) => onPatch({ zoomUrl: event.target.value })} /></Field>
-      <Field label="Campus"><input value={draft.campusUrl ?? ""} onChange={(event) => onPatch({ campusUrl: event.target.value })} /></Field>
-      <Field label="Brochure"><input value={draft.brochureUrl ?? ""} onChange={(event) => onPatch({ brochureUrl: event.target.value })} /></Field>
-      <Field label="Video comercial"><input value={draft.videoUrl ?? ""} onChange={(event) => onPatch({ videoUrl: event.target.value })} /></Field>
+      <Field label="Formulario de inscripción" helpKey="products.form_url" wide><input value={draft.formUrl ?? ""} onChange={(event) => onPatch({ formUrl: event.target.value })} /></Field>
+      <Field label="Grupo WhatsApp" helpKey="products.whatsapp_group"><input value={draft.whatsappGroupUrl ?? ""} onChange={(event) => onPatch({ whatsappGroupUrl: event.target.value })} /></Field>
+      <Field label="Zoom" helpKey="products.zoom_url"><input value={draft.zoomUrl ?? ""} onChange={(event) => onPatch({ zoomUrl: event.target.value })} /></Field>
+      <Field label="Campus" helpKey="products.campus_url"><input value={draft.campusUrl ?? ""} onChange={(event) => onPatch({ campusUrl: event.target.value })} /></Field>
+      <Field label="Brochure" helpKey="products.brochure_url"><input value={draft.brochureUrl ?? ""} onChange={(event) => onPatch({ brochureUrl: event.target.value })} /></Field>
+      <Field label="Video comercial" helpKey="products.video_url"><input value={draft.videoUrl ?? ""} onChange={(event) => onPatch({ videoUrl: event.target.value })} /></Field>
     </div>
   );
 }
@@ -628,6 +768,10 @@ function ReviewStep({ draft }: { draft: SalesProgram }) {
       <SummaryItem label="Modalidad" value={draft.modality || "Pendiente"} />
       <SummaryItem label="Inicio" value={formatDate(draft.startDate)} />
       <SummaryItem label="Precio desde" value={money(calculatePriceFrom(draft))} />
+      <SummaryItem label="Ingreso al aula" value={draft.accessConfig?.admissionMode || "Pendiente"} />
+      <SummaryItem label="Habilitación" value={draft.accessConfig?.releaseRule || "Pendiente"} />
+      <SummaryItem label="Módulos / clases" value={`${draft.academicConfig?.moduleCount || 0} / ${draft.academicConfig?.sessionCount || 0}`} />
+      <SummaryItem label="Evaluación" value={draft.academicConfig?.evaluationRequired ? `Sí, mínimo ${draft.academicConfig.minimumPassingGrade || 13}` : "No obligatoria"} />
       <SummaryItem label="Certifica" value={draft.certifyingInstitution || "Pendiente"} />
       <SummaryItem label="Formulario" value={draft.formUrl ? "Asignado" : "Sin formulario"} />
       <div className="product-alert-list">
@@ -639,12 +783,90 @@ function ReviewStep({ draft }: { draft: SalesProgram }) {
 
 type StepProps = { draft: SalesProgram; onPatch: (patch: Partial<SalesProgram>) => void };
 
-function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) {
+function Field({ label, children, wide = false, helpKey }: { label: string; children: React.ReactNode; wide?: boolean; helpKey?: string }) {
   return (
     <label className={`field ${wide ? "span-2" : ""}`}>
-      <span>{label}</span>
+      <FieldLabel label={label} helpKey={helpKey} />
       {children}
     </label>
+  );
+}
+
+function AddableSelect({
+  value,
+  options,
+  addLabel,
+  placeholder = "Seleccionar",
+  onChange
+}: {
+  value: string;
+  options: string[];
+  addLabel: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  const mergedOptions = uniqueStrings([value, ...options].filter(Boolean));
+
+  function addOption() {
+    const next = window.prompt(`Agregar ${addLabel}`, "");
+    if (!next?.trim()) return;
+    onChange(next.trim());
+  }
+
+  return (
+    <div className="field-action-row">
+      <select value={value ?? ""} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{placeholder}</option>
+        {mergedOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+      <button className="icon-button add-field-option" type="button" aria-label={`Agregar ${addLabel}`} onClick={addOption}>
+        <Plus size={15} />
+      </button>
+    </div>
+  );
+}
+
+function ClassDaysMiniModal({
+  selected,
+  onChange,
+  onClose
+}: {
+  selected: string[];
+  onChange: (days: string[]) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="mini-modal-backdrop" role="dialog" aria-modal="true" aria-label="Seleccionar dias de clase">
+      <div className="mini-modal-card">
+        <div className="mini-modal-header">
+          <div>
+            <p className="eyebrow">Dias de clase</p>
+            <strong>Seleccionar dias</strong>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="class-days-grid">
+          {classDayOptions.map((day) => {
+            const active = selected.includes(day);
+            return (
+              <button
+                key={day}
+                type="button"
+                className={active ? "chip active" : "chip"}
+                onClick={() => onChange(toggleValue(selected, day))}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mini-modal-actions">
+          <button className="ghost-button small" type="button" onClick={() => onChange(classDayOptions)}>Todos</button>
+          <button className="ghost-button small" type="button" onClick={() => onChange([])}>Limpiar</button>
+          <button className="primary-button small" type="button" onClick={onClose}>Aplicar</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -670,6 +892,12 @@ function DetailModal({ program, sales, onClose, onEdit }: { program: SalesProgra
           <SummaryItem label="Duración" value={`${program.durationValue || 0} ${program.durationUnit || ""}`} />
           <SummaryItem label="Horario" value={program.scheduleSummary || "Pendiente"} />
           <SummaryItem label="Horas académicas" value={String(program.academicHours || 0)} />
+          <SummaryItem label="Ingreso al aula" value={program.accessConfig?.admissionMode || "Pendiente"} />
+          <SummaryItem label="Habilitación" value={program.accessConfig?.releaseRule || "Pendiente"} />
+          <SummaryItem label="Acceso" value={`${program.accessConfig?.accessDurationDays || 0} días`} />
+          <SummaryItem label="Módulos" value={String(program.academicConfig?.moduleCount || 0)} />
+          <SummaryItem label="Clases" value={String(program.academicConfig?.sessionCount || 0)} />
+          <SummaryItem label="Evaluación" value={program.academicConfig?.evaluationRequired ? `Obligatoria · ${program.academicConfig.minimumPassingGrade || 13}/20` : "No obligatoria"} />
           <SummaryItem label="Certifica" value={program.certifyingInstitution || "Pendiente"} />
           <SummaryItem label="Dirigido a" value={program.targetAudience || "Pendiente"} />
           <SummaryItem label="Precio desde" value={money(calculatePriceFrom(program))} />
@@ -684,6 +912,14 @@ function DetailModal({ program, sales, onClose, onEdit }: { program: SalesProgra
           <article>
             <h3>Links</h3>
             <p>{program.formUrl ? `Formulario: ${program.formUrl}` : "Producto sin formulario asignado."}</p>
+          </article>
+          <article>
+            <h3>Operación del aula</h3>
+            <p>Credenciales: {program.accessConfig?.credentialDelivery || "Pendiente"} · Bienvenida: {program.accessConfig?.welcomeChannel || "Pendiente"} · Materiales: {program.academicConfig?.materialsDeliveryMode || "Pendiente"}.</p>
+          </article>
+          <article>
+            <h3>Cierre académico</h3>
+            <p>{program.academicConfig?.certificateRule || "Condición de certificado pendiente"} · Seguimiento: {program.academicConfig?.progressTracking || "Pendiente"}.</p>
           </article>
           <article>
             <h3>Historial</h3>
@@ -946,6 +1182,43 @@ function groupSalesByProgram(sales: Sale[]) {
     map.set(sale.productName, list);
   });
   return map;
+}
+
+function buildCatalogSelectOptions(state: ReturnType<typeof getCommercialState>): CatalogSelectOptions {
+  const programs = Array.isArray(state.programs) ? state.programs : [];
+  const executives = Array.isArray(state.executives) ? state.executives : [];
+  const users = Array.isArray(state.users) ? state.users : [];
+  const commercialUsers = users
+    .filter((user) => {
+      const role = normalize(String(user.role ?? ""));
+      return user.status === "Activo" && (
+        role.includes("ejecutivo") ||
+        role.includes("lider") ||
+        role.includes("jefe") ||
+        role.includes("encargado") ||
+        role.includes("supervisor")
+      );
+    })
+    .map((user) => user.fullName);
+
+  return {
+    productTypes: uniqueStrings([...productTypeOptions.map(String), ...programs.map((program) => String(program.productType ?? ""))]),
+    commercialOwners: uniqueStrings([
+      ...executives.filter((executive) => executive.status === "Activo").map((executive) => executive.fullName),
+      ...commercialUsers,
+      ...programs.map((program) => program.commercialOwner ?? "")
+    ]),
+    academicOwners: uniqueStrings(programs.map((program) => program.academicOwner ?? "")),
+    audiences: uniqueStrings([
+      ...audienceOptions,
+      ...programs.flatMap((program) => program.allowedProfiles ?? []),
+      ...programs.flatMap((program) => String(program.targetAudience ?? "").split(",").map((item) => item.trim()))
+    ])
+  };
+}
+
+function parseClassDays(value: string) {
+  return uniqueStrings(value.split(",").map((item) => item.trim()).filter(Boolean));
 }
 
 function monthOptions(programs: SalesProgram[]) {

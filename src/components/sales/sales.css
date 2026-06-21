@@ -128,6 +128,37 @@
   gap: 8px;
 }
 
+.sales-program-operations {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(0, 167, 235, 0.2);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(0, 167, 235, 0.06);
+}
+
+.sales-program-operations span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: #fff;
+}
+
+.sales-program-operations strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.sales-program-operations small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
 .option-inline .icon-button {
   width: 42px;
   min-width: 42px;
@@ -463,6 +494,10 @@
   .sales-validation-table {
     min-width: 860px;
   }
+
+  .sales-program-operations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .sales-net-preview {
@@ -537,6 +572,10 @@
 
   .sales-validation-card {
     padding: 16px;
+  }
+
+  .sales-program-operations {
+    grid-template-columns: 1fr;
   }
 
   .sales-validation-table {
